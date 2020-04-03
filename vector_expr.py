@@ -1,13 +1,16 @@
 import sympy as sp
-from sympy.core.compatibility import string_types, default_sort_key, with_metaclass
+from sympy.core.compatibility import string_types, default_sort_key, with_metaclass, reduce
 from sympy.core.decorators import call_highest_priority
+from sympy.core.evalf import EvalfMixin
+from sympy.core.operations import AssocOp
 from sympy.core.singleton import Singleton
+
 from sympy.vector import (
     Vector, 
     divergence, curl
 )
 
-class VectorExpr(sp.Expr):
+class VectorExpr(sp.Expr, EvalfMixin):
     is_Vector = False
     is_VectorExpr = True
     is_Cross = False
@@ -67,6 +70,12 @@ class VectorExpr(sp.Expr):
 
     def __rdiv__(self, other):
         raise NotImplementedError()
+
+    def __truediv__(self, other):
+        return self * other**sp.S.NegativeOne
+
+    def __floordiv__(self, other):
+        raise NotImplementedError()
     
     def __neg__(self):
         return VecMul(sp.S.NegativeOne, self, check=True)
@@ -96,6 +105,12 @@ class VectorExpr(sp.Expr):
         
     def __xor__(self, other):
         return VecCross(self, other)
+
+    def _eval_derivative_n_times(self, s, n):
+        return sp.Basic._eval_derivative_n_times(self, s, n)
+    
+    def _accept_eval_derivative(self, s):
+        return s._visit_eval_derivative_scalar(self)
     
     @property
     def free_symbols(self):
@@ -113,7 +128,17 @@ class VectorExpr(sp.Expr):
         if deep:
             args = [arg.doit(**kwargs) for arg in self.args]
         return self.func(*args)
-    
+
+    def diff(self, *symbols, **assumptions):
+        assumptions.setdefault("evaluate", True)
+        # need an unevaluated derivative to check the number of differentiation symbols
+        d = sp.Derivative(self, *symbols)
+        if not isinstance(d, sp.Derivative):
+            return self
+        elif len(d.variable_count) > 1:
+            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
+        return D(sp.Derivative(self, *symbols, **assumptions))
+
     def normalize(self, **kwargs):
         evaluate = kwargs.get('evaluate', False)
         if isinstance(self, VectorZero):
@@ -143,21 +168,27 @@ class VectorExpr(sp.Expr):
     # TODO: 
     # the gradient of a vector is a matrix!!!
     # the gradient of a scalar is a vector!!!
-    @property
     def gradient(self):
         raise NotImplementedError("Gradient not implemented")
     
-    grad = gradient
-    
     @property
+    def grad(self):
+        return self.gradient()
+    
     def divergence(self):
         return Nabla() & self
     
-    div = divergence
+    @property
+    def div(self):
+        return self.divergence()
     
+
     def curl(self):
         return Nabla() ^ self
-    
+   
+    @property
+    def cu(self):
+        return self.curl()
     
 class VectorSymbol(VectorExpr):
     is_symbol = True
@@ -173,13 +204,6 @@ class VectorSymbol(VectorExpr):
     def name(self):
         return self.args[0].name
     
-    def __call__(self, *args):
-        raise TypeError("%s object is not callable" % self.__class__)
-    
-    def magnitude(self):
-        return Magnitude(self)
-    
-
 class VectorZero(with_metaclass(Singleton, VectorSymbol)):
     is_ZeroVector = True
     
@@ -188,8 +212,10 @@ class VectorZero(with_metaclass(Singleton, VectorSymbol)):
         obj = sp.Basic.__new__(cls, name)
         return obj
     
-    def doit(self, **kwargs):
-        deep = kwargs.get('deep', True)
+    def magnitude(self):
+        return 0
+
+    def _eval_derivative(self, s):
         return self
 
 class VectorOne(with_metaclass(Singleton, VectorSymbol)):
@@ -198,9 +224,8 @@ class VectorOne(with_metaclass(Singleton, VectorSymbol)):
         obj = sp.Basic.__new__(cls, name)
         return obj
     
-    def doit(self, **kwargs):
-        deep = kwargs.get('deep', True)
-        return self
+    def _eval_derivative(self, s):
+        return VectorZero()
 
 VectorSymbol.zero = VectorZero()
 VectorSymbol.one = VectorOne()
@@ -212,9 +237,8 @@ class Nabla(with_metaclass(Singleton, VectorSymbol)):
         obj = sp.Basic.__new__(cls, name)
         return obj
     
-    def doit(self, **kwargs):
-        deep = kwargs.get('deep', True)
-        return self
+    def diff(self, *symbols, **assumptions):
+        raise NotImplementedError("Differentiation of nabla operator not implemented.")
 
 class Normalize(VectorExpr):
     is_Normalized = True
@@ -252,6 +276,69 @@ class Magnitude(VectorExpr):
             return args[0].magnitude()
         return self.func(*args)
     
+    def diff(self, *symbols, **assumptions):
+        """
+        TODO:
+
+        Here comes the problem: I'm using is_scalar and is_Vector to distinguish
+        between scalar and vector quantities (scalar related to vectors, ie dot-product,
+        magnitude, ...).
+        However, is_scalar is also used by sp.Derivative: if the expression is scalar and
+        the differentiation symbol is different from the expression, it will return 0,
+        which is wrong in this case: for what we know, magnitude is an expression containing
+        also the differentiation symbol.
+        Hence, need to override the diff method.
+        
+        See if it's possible to create a different property instead of using is_scalar, for
+        example is_Vector_scalar.
+        Note: in VecAdd, VecMul, VecPow we will need to consider both the new property as well as 
+        is_scalar (used by standard symbolic expressions) to decide if the resulting expression
+        is a vector or a scalar.
+        """
+        d = sp.Derivative(self, *symbols)
+        if not isinstance(d, sp.Derivative):
+            return self
+        elif len(d.variable_count) > 1:
+            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
+        return D(d)
+
+class D(VectorExpr):
+    """ Represent an unevaluated derivative.
+
+    This class is necessary because even if it's possible to set the attribute
+    is_Vector=True to an unevaluated Derivative (as of Sympy version 1.5.1, which
+    may be a bug), it is not possible to set this attribute to objects of type 
+    Add (read-only property). If v1 and v2 are two vector expression with is_Vector=True:
+        d = sp.Derivative(v1 + v2, x).doit()
+    will return Add(sp.Derivative(v1, x), sp.Derivative(v2, x)), with is_Vector=False,
+    which is wrong, preventing from further vector expression operations. For example,
+    VecCross(v1, d) will fail because d.is_Vector=False.
+
+    Solution! Wrap unevaluated derivatives with this class.
+    """
+    is_Vector = False
+
+    def __new__(cls, d):
+        if not isinstance(d, sp.Derivative):
+            return d
+
+        obj = sp.Basic.__new__(cls, d)
+        obj.is_Vector = d.expr.is_Vector
+        return obj
+    
+    def _eval_derivative(self, s):
+        d = self.args[0]
+        variable_count = list(d.variable_count) + [(s, 1)]
+        return D(sp.Derivative(d.expr, *variable_count))
+    
+    def _eval_derivative_n_times(self, s, n):
+        d = self.args[0]
+        variable_count = list(d.variable_count) + [(s, n)]
+        d = sp.Derivative(d.expr, *variable_count)
+        if len(d.variable_count) > 1:
+            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
+        return D(d)
+
 class VecDot(VectorExpr):
     is_Dot = True
     is_scalar = True
@@ -272,22 +359,44 @@ class VecDot(VectorExpr):
         obj = sp.Expr.__new__(cls, expr1, expr2)
         return obj
     
+    @property
+    def reverse(self):
+        return self.args[1] & self.args[0]
+
     def doit(self, **kwargs):
         deep = kwargs.get('deep', True)
         # TODO: this is wrong! Better to look if expr has the attribute is_Vector and check its value
-        if isinstance(self.args[0], (Vector, VectorMul, VectorAdd)) and \
-            isinstance(self.args[1], (Vector, VectorMul, VectorAdd)):
+        if isinstance(self.args[0], Vector) and \
+            isinstance(self.args[1], Vector):
             return self.args[0].dot(self.args[1])
-        if isinstance(self.args[0], (Vector, VectorMul, VectorAdd)) and \
+        if isinstance(self.args[0], Vector) and \
             isinstance(self.args[1], Nabla):
             return divergence(self.args[0])
-        if isinstance(self.args[1], (Vector, VectorMul, VectorAdd)) and \
+        if isinstance(self.args[1], Vector) and \
             isinstance(self.args[0], Nabla):
             return divergence(self.args[1])
         args = self.args
         if deep:
             args = [arg.doit(**kwargs) for arg in self.args]
         return self.func(*args)
+    
+    def diff(self, *symbols, **assumptions):
+        """
+        NOTE: see Magnitude.diff comment to understand why I need to overwrite
+        this method.
+        """
+        d = sp.Derivative(self, *symbols)
+        if not isinstance(d, sp.Derivative):
+            return self
+        elif len(d.variable_count) > 1:
+            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
+        
+        s, n = d.variable_count[0]
+        result = _diff_cross_dot(self, s)
+        while n > 1:
+            result = result.diff(s)
+            n -= 1
+        return result
 
 class VecCross(VectorExpr):
     is_Cross = True
@@ -299,9 +408,8 @@ class VecCross(VectorExpr):
         expr2 = sp.sympify(expr2)
 
         # TODO: better to look if expr has the attribute is_Vector and check its value
-        if not (isinstance(expr1, (VectorExpr, Vector)) and \
-            isinstance(expr2, (VectorExpr, Vector)) and \
-            expr1.is_Vector and expr2.is_Vector):
+        if not ((hasattr(expr1, "is_Vector") and hasattr(expr2, "is_Vector")) and 
+                (expr1.is_Vector and expr2.is_Vector)):
             raise TypeError("Both side of the cross-operator must be vectors")
         if expr1 == VectorZero() or expr2 == VectorZero():
             return VectorZero()
@@ -310,6 +418,10 @@ class VecCross(VectorExpr):
 
         obj = sp.Expr.__new__(cls, expr1, expr2)
         return obj
+    
+    @property
+    def reverse(self):
+        return -(self.args[1] ^ self.args[0])
     
     def doit(self, **kwargs):
         deep = kwargs.get('deep', True)
@@ -327,16 +439,64 @@ class VecCross(VectorExpr):
             args = [arg.doit(**kwargs) for arg in self.args]
         return self.func(*args)
     
-    def diff(self, *symbols, **assumptions):
-        assumptions.setdefault("evaluate", True)
-        t1 = VecCross(sp.Derivative(self.args[0], *symbols, **assumptions), self.args[1])
-        t2 = VecCross(self.args[0], sp.Derivative(self.args[1], *symbols, **assumptions))
-        return t1 + t2
+    def _eval_derivative(self, s):
+        return _diff_cross_dot(self, s)
     
-    
-class VecAdd(VectorExpr, sp.Add):
+    def _eval_derivative_n_times(self, s, n):
+        if isinstance(n, (int, sp.Integer)):
+            result = self._eval_derivative(s)
+            while n > 1:
+                result = result.diff(s)
+                n -= 1
+            return result
+        raise TypeError("Derivative order must be integer")
+
+
+"""
+TODO: probably best to create a base class for VecDot, VecCross and put this there,
+together with _eval_derivative(), _eval_derivative_n_times() and the property reverse,
+once the problem with is_Vector has been fixed (see Magnitude.diff comment to understand).
+"""
+def _diff_cross_dot(expr, s):
+    if not isinstance(expr, (VecCross, VecDot)):
+        raise TypeError("_diff_cross_dot method only works with instances of VecCross and VecDot.")
+
+    expr0 = expr.args[0].diff(s)
+    expr1 = expr.args[1].diff(s)
+    t1 = expr.func(expr0, expr.args[1])
+    t2 = expr.func(expr.args[0], expr1)
+    return t1 + t2
+
+"""
+In a perfect world I would be happy to derive VecAdd from sp.Add,
+after all, it's an addition!
+If I do that, I would have problems with n-th derivatives.
+Consider the following code:
+
+def _eval_derivative_n_times(self, s, n):
+    result = self
+    for i in range(n):
+        result = result._eval_derivative(s)
+    print(type(result))     # VecAdd
+    return result
+
+The print statement would clearly show that result is of type VecAdd, hovewer
+the returned type would be sp.Add. Why? Seems like the result is intercepted by
+some other function and post-processed. I don't which function....
+
+Similarly, (v1 ^ v2).diff(x, 2) would return an instance of sp.Add, not VecAdd.
+
+Temporary solution: discard the hierarchy from sp.Add, derives directly from
+AssocOp. Now n-th derivatives return VecAdd, but no simplification is done over
+the arguments!
+"""
+
+# class VecAdd(VectorExpr, sp.Add):
+class VecAdd(VectorExpr, AssocOp):
     is_VecAdd = True
     is_commutative = True
+    
+    identity = 0
     
     def __new__(cls, *args, **kwargs):
         check = kwargs.get('check', True)
@@ -355,13 +515,18 @@ class VecAdd(VectorExpr, sp.Add):
         # flatten the arguments
         # example: if we were to write 3 * v1 * 4 it would be interpreted as
         # VecMul(3, VecMul(v1, 4)). We want it like: VecMul(12, v1)
-        c_part, nc_part, order_symbols = cls.flatten(args)
+        #
+        # If VecAdd derived from sp.Add, I could use: c_part, nc_part, order_symbols = cls.flatten(args)
+        # but since it derives from AssocOp, need to call sp.Add.flatten
+        # c_part, nc_part, order_symbols = cls.flatten(args)
+        c_part, nc_part, order_symbols = sp.Add.flatten(args)
+
         args = c_part + nc_part
         is_commutative = not nc_part
         # have to do this step!!!
         sanitize_args(args)
         obj = cls._from_args(args, is_commutative)
-        
+
         # if there is only one argument and it was 1, then obj is the number one,
         # whose property is_Vector is hidden, therefore return 1 immediatly
         if isinstance(obj, sp.Number):
@@ -384,6 +549,16 @@ class VecAdd(VectorExpr, sp.Add):
                 raise TypeError("Mix of Vector and Scalar symbols")
 
         return obj
+
+    def _eval_derivative(self, s):
+        return self.func(*[a.diff(s) for a in self.args])
+    
+    # def _eval_derivative_n_times(self, s, n):
+    #     result = self
+    #     for i in range(n):
+    #         result = result._eval_derivative(s)
+    #     return result
+
 
 
 class VecMul(VectorExpr, sp.Mul):
@@ -446,6 +621,34 @@ class VecMul(VectorExpr, sp.Mul):
                 return sp.Mul.fromiter(args)
         return obj
     
+    def _eval_derivative(self, s):
+        # adapted from Mul._eval_derivative
+        args = list(self.args)
+        terms = []
+        for i in range(len(args)):
+            d = args[i].diff(s)
+            if d:
+                # Note: reduce is used in step of Mul as Mul is unable to
+                # handle subtypes and operation priority:
+                terms.append(reduce(lambda x, y: x*y, (args[:i] + [d] + args[i + 1:]), sp.S.One))
+        return VecAdd.fromiter(terms)
+    
+    def _eval_derivative_n_times(self, s, n):
+        # adapted from Mul._eval_derivative_n_times
+        from sympy import Integer
+        from sympy.ntheory.multinomial import multinomial_coefficients_iterator
+
+        args = self.args
+        m = len(args)
+        if isinstance(n, (int, Integer)):
+            # https://en.wikipedia.org/wiki/General_Leibniz_rule#More_than_two_factors
+            terms = []
+            for kvals, c in multinomial_coefficients_iterator(m, n):
+                p = VecMul(*[arg.diff((s, k)) for k, arg in zip(kvals, args)])
+                terms.append(c * p)
+            return VecAdd(*terms)
+        raise TypeError("Derivative order must be integer")
+    
 class VecPow(VectorExpr):
     def __new__(cls, base, exp):
         base = sp.S(base)
@@ -461,6 +664,13 @@ class VecPow(VectorExpr):
     @property
     def exp(self):
         return self.args[1]
+    
+    def _eval_derivative(self, s):
+        # adapted from Pow._eval_derivative
+        dbase = self.base.diff(s)
+        dexp = self.exp.diff(s)
+        return self * (dexp * sp.log(self.base) + dbase * self.exp / self.base)
+    
 
 def sanitize_args(args):
     # flatten may remove instances of VecMul. For example, 
@@ -479,3 +689,8 @@ def sanitize_args(args):
                 args[i] = a.replace(sp.Mul, VecMul)
                 args[i].is_Vector = any([isinstance(arg, VectorSymbol) for arg in a.args])
     return args
+
+
+# TODO:
+# *. find out why class VecAdd(Add) returns Add objects, not VecAdd
+# *. printing of (v1 + (v1 ^ one) * (v1 & v2))

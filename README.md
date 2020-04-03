@@ -12,8 +12,11 @@ Unfortunately, vector expressions (involving dot and cross products, magnitude, 
 
 ## TODO
 
+* Operation precedence.
+* Fix VecAdd, read the comments in the code to understand the problem.
+* Printing need some works, especially VecMul. For example, `(v1 & v2) * (v1 ^ v2)` looks unintuitive.
 * Rules of expansion, collection, simplification.
-* Fix derivatives of vector expressions.
+* General derivatives of vector expressions.
 * Solve for vector expressions.
 * Gradient: the gradient of a scalar field is a vector; the gradient of a vector field is a tensor (matrix). Is it possible to implement them in this module? Is it possible to integrate them with tensor and linear algebra modules?
 * Add unit test.

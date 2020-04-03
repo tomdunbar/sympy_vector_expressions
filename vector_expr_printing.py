@@ -2,10 +2,10 @@ import sympy as sp
 from sympy.core.function import _coeff_isneg
 from sympy.printing.latex import LatexPrinter, translate
 from sympy.printing.precedence import precedence_traditional
-from sympy.printing.conventions import split_super_sub
+from sympy.printing.conventions import split_super_sub, requires_partial
 from vector_expr import (
-    VecAdd, VecCross, VecDot,
-    VecMul, VecPow, VectorOne, VectorZero
+    VecAdd, VecCross, VecDot, VecMul, VecPow, VectorExpr,
+    Magnitude, Normalize, VectorOne, VectorZero, D
 )
 # adapted from sympy.printing.latex
 def vector_latex(expr, fold_frac_powers=False, fold_func_brackets=False,
@@ -109,6 +109,10 @@ class MyLatexPrinter(LatexPrinter):
 
             return result
         return vec_symbol % expr
+    
+    def _print_VecAdd(self, expr):
+        # NOTE: only needed if VecAdd doesn't derive from sp.Add
+        return self._print_Add(sp.Add(*expr.args))
 
     def _print_VecDot(self, expr):
         expr1, expr2 = expr.args
@@ -160,3 +164,18 @@ class MyLatexPrinter(LatexPrinter):
                 self.parenthesize(base, precedence_traditional(expr), True),
                 self.parenthesize(exp, precedence_traditional(expr), True),
             )
+    
+    def _print_D(self, expr):
+        # D is just a wrapper class, doesn't need any rendering
+        return self._print_Derivative(expr.args[0])
+    
+    def _print_Derivative(self, expr):
+        # kind of an hack to wrap VectorExpression instances in parentheses
+        latex = super()._print_Derivative(expr)
+        expr_latex = None
+        if isinstance(expr.expr, VectorExpr):
+            expr_latex = self._print(expr.expr)
+        if expr_latex:
+            expr_wrapped = r"\left(%s\right)" % expr_latex
+            latex = latex.replace(expr_latex, expr_wrapped)
+        return latex
