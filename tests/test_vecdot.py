@@ -46,13 +46,13 @@ class test_VecDot(u.TestCase, CommonTest):
         assert not VecDot(self.v1, self.zero).is_Vector
         assert VecDot(self.v1, self.zero).is_scalar
         assert not VecDot(self.v1, self.v2).is_Vector
-        assert VecDot(self.v1, self.v2).is_scalar
+        assert VecDot(self.v1, self.v2).is_Vector_Scalar
         assert not VecDot(self.vn1, self.vn2).is_Vector
-        assert VecDot(self.vn1, self.vn2).is_scalar
+        assert VecDot(self.vn1, self.vn2).is_Vector_Scalar
         assert not VecDot(self.v1, self.vn1).is_Vector
-        assert VecDot(self.v1, self.vn1).is_scalar
+        assert VecDot(self.v1, self.vn1).is_Vector_Scalar
         assert not VecDot(self.v1 ^ self.v2, self.v1).is_Vector
-        assert VecDot(self.v1 ^ self.v2, self.v1).is_scalar
+        assert VecDot(self.v1 ^ self.v2, self.v1).is_Vector_Scalar
     
     def test_reverse(self):
         assert VecDot(self.v1, self.v2).reverse == VecDot(self.v2, self.v1)

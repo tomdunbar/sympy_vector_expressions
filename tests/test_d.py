@@ -33,13 +33,13 @@ class test_VecDot(u.TestCase, CommonTest):
     
     def test_is_vector(self):
         assert (self.v1 + self.v2).diff(x, evaluate=False).is_Vector
-        assert not (self.v1 + self.v2).diff(x, evaluate=False).is_scalar
+        assert not (self.v1 + self.v2).diff(x, evaluate=False).is_Vector_Scalar
         assert (self.v1.mag * self.v2).diff(x, evaluate=False).is_Vector
-        assert not (self.v1.mag * self.v2).diff(x, evaluate=False).is_scalar
+        assert not (self.v1.mag * self.v2).diff(x, evaluate=False).is_Vector_Scalar
         assert not (self.v1 & self.v2).diff(x, evaluate=False).is_Vector
-        assert (self.v1 & self.v2).diff(x, evaluate=False).is_scalar
+        assert (self.v1 & self.v2).diff(x, evaluate=False).is_Vector_Scalar
         assert (self.v1 ^ self.v2).diff(x, evaluate=False).is_Vector
-        assert not (self.v1 ^ self.v2).diff(x, evaluate=False).is_scalar
+        assert not (self.v1 ^ self.v2).diff(x, evaluate=False).is_Vector_Scalar
     
 
 if __name__ == "__main__":

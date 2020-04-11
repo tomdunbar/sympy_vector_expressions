@@ -20,6 +20,7 @@ class test_Normalize(u.TestCase, CommonTest):
         assert isinstance(Normalize(self.v1), Normalize)
         assert isinstance(Normalize(self.one), Normalize)
         assert Normalize(self.zero) == self.zero
+        assert isinstance(Normalize(x * self.v1), Normalize)
 
         def func(arg):
             with self.assertRaises(TypeError) as context:
@@ -28,7 +29,7 @@ class test_Normalize(u.TestCase, CommonTest):
         assert isinstance(Normalize(self.v1 + self.v2), Normalize)
         assert isinstance(Normalize(self.vn1), Normalize)
 
-        args = [self.nabla, 1, self.v1.mag, x * self.v1, VecDot(self.v1, self.v2)]
+        args = [self.nabla, 1, self.v1.mag, VecDot(self.v1, self.v2)]
         for a in args:
             func(a)
 

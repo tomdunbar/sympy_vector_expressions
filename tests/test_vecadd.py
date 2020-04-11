@@ -1,6 +1,6 @@
 import unittest as u
 from common import CommonTest, x, y, z
-from sympy import Add, Mul, S
+from sympy import Add, Mul, S, srepr
 from sympy.vector import CoordSys3D, Vector, VectorZero as VZero
 
 import os,sys,inspect
@@ -13,6 +13,9 @@ from vector_expr import (
 )
 
 # TODO: should Nabla be allowed as an argument of VecAdd?
+
+def d(obj):
+    print("WTF", type(obj), srepr(obj))
 
 class test_VecAdd(u.TestCase, CommonTest):
     def setUp(self):
@@ -31,6 +34,7 @@ class test_VecAdd(u.TestCase, CommonTest):
         assert VecAdd(0) == S.Zero
         # one argument is 0 or VectorZero()
         assert VecAdd(self.one, self.zero) == self.one
+        assert VecAdd(VectorOne(), VectorZero()) == self.one
         assert VecAdd(0, x) == x
         assert VecAdd(self.zero, self.v1) == self.v1
         assert VecAdd(self.v1.mag, 0) == self.v1.mag
@@ -127,19 +131,19 @@ class test_VecAdd(u.TestCase, CommonTest):
 
     def test_is_vector(self):
         assert VecAdd(self.v1, self.v2).is_Vector
-        assert not VecAdd(self.v1, self.v2).is_scalar
+        assert not VecAdd(self.v1, self.v2).is_Vector_Scalar
         assert not VecAdd(self.v1.mag, self.v2.mag).is_Vector
-        assert VecAdd(self.v1.mag, self.v2.mag).is_scalar
+        assert VecAdd(self.v1.mag, self.v2.mag).is_Vector_Scalar
         # with dot product and nested mul/dot
         assert not VecAdd(2, self.v2 & self.v1).is_Vector
-        assert VecAdd(2, self.v2 & self.v1).is_scalar
+        assert VecAdd(2, self.v2 & self.v1).is_Vector_Scalar
         assert not VecAdd(2, VecMul(x, self.v2 & self.v1)).is_Vector
-        assert VecAdd(2,  VecMul(x, self.v2 & self.v1)).is_scalar
+        assert VecAdd(2,  VecMul(x, self.v2 & self.v1)).is_Vector_Scalar
         # with cross product and nested mul/cross
         assert VecAdd(self.v1, self.v2 ^ self.v1).is_Vector
-        assert not VecAdd(self.v1, self.v2 ^ self.v1).is_scalar
+        assert not VecAdd(self.v1, self.v2 ^ self.v1).is_Vector_Scalar
         assert VecAdd(self.v1, VecMul(x, self.v2 ^ self.v1)).is_Vector
-        assert not VecAdd(self.v1,  VecMul(x, self.v2 ^ self.v1)).is_scalar
+        assert not VecAdd(self.v1, VecMul(x, self.v2 ^ self.v1)).is_Vector_Scalar
 
 if __name__ == "__main__":
     u.main()

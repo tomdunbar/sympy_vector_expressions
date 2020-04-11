@@ -111,28 +111,28 @@ class test_VecMul(u.TestCase, CommonTest):
         assert VecMul(3, VecDot(self.v1, self.v2), VecMul(x, VecCross(self.v1, self.v2))).is_Vector
         assert not VecMul(3, VecDot(self.v1, self.v2), VecDot(VecMul(x, VecCross(self.v1, self.v2)), self.v1)).is_Vector
 
-    def test_is_commutative(self):
-        # one argument
-        assert VecMul(1).is_commutative
-        assert VecMul(self.one).is_commutative
-        assert VecMul(self.zero).is_commutative
-        assert VecMul(0).is_commutative
-        assert VecMul(x).is_commutative
-        # two arguments
-        assert VecMul(x, self.v1).is_commutative
-        assert VecMul(x, self.v1.mag).is_commutative
-        assert VecMul(x, self.v1 + self.v2).is_commutative
-        assert not VecMul(x, self.v1 ^ self.v2).is_commutative
-        assert VecMul(x, self.v1 & self.v2).is_commutative
+    # def test_is_commutative(self):
+    #     # one argument
+    #     assert VecMul(1).is_commutative
+    #     assert VecMul(self.one).is_commutative
+    #     assert VecMul(self.zero).is_commutative
+    #     assert VecMul(0).is_commutative
+    #     assert VecMul(x).is_commutative
+    #     # two arguments
+    #     assert VecMul(x, self.v1).is_commutative
+    #     assert VecMul(x, self.v1.mag).is_commutative
+    #     assert VecMul(x, self.v1 + self.v2).is_commutative
+    #     assert not VecMul(x, self.v1 ^ self.v2).is_commutative
+    #     assert VecMul(x, self.v1 & self.v2).is_commutative
         
-        t = Symbol("t", commutative=False)
-        assert not VecMul(t, self.v1).is_commutative
-        assert not VecMul(t, self.v1 ^ self.v2).is_commutative
+    #     t = Symbol("t", commutative=False)
+    #     assert not VecMul(t, self.v1).is_commutative
+    #     assert not VecMul(t, self.v1 ^ self.v2).is_commutative
 
-        assert not VecMul(x, self.v1 ^ self.v2, evaluate=False).is_commutative
-        assert VecMul(x, self.v1 & self.v2, evaluate=False).is_commutative
-        assert not VecMul(t, self.v1, evaluate=False).is_commutative
-        assert not VecMul(t, self.v1 ^ self.v2, evaluate=False).is_commutative
+    #     assert not VecMul(x, self.v1 ^ self.v2, evaluate=False).is_commutative
+    #     assert VecMul(x, self.v1 & self.v2, evaluate=False).is_commutative
+    #     assert not VecMul(t, self.v1, evaluate=False).is_commutative
+    #     assert not VecMul(t, self.v1 ^ self.v2, evaluate=False).is_commutative
 
 if __name__ == "__main__":
     u.main()

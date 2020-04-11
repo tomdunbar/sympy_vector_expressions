@@ -13,7 +13,6 @@ Unfortunately, vector expressions (involving dot and cross products, magnitude, 
 ## TODO
 
 * Operation precedence.
-* Fix VecAdd, read the comments in the code to understand the problem.
 * Printing need some works, especially VecMul. For example, `(v1 & v2) * (v1 ^ v2)` looks unintuitive.
 * Rules of expansion, collection, simplification.
 * General derivatives of vector expressions.

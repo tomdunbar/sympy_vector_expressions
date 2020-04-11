@@ -1,5 +1,8 @@
-import sympy as sp
-from sympy.core import Add, Basic, sympify
+# import sympy as sp
+from sympy import (
+    sympify, S, Basic, Expr, Derivative, Abs, Mul, Add, Pow, 
+    Symbol, Number, log
+)
 from sympy.core.compatibility import (
     string_types, default_sort_key, with_metaclass, reduce
 )
@@ -14,7 +17,7 @@ from sympy.vector import (
     divergence, curl
 )
 
-class VectorExpr(sp.Expr):
+class VectorExpr(Expr):
     is_Vector = False
     is_VectorExpr = True
     is_Cross = False
@@ -29,10 +32,12 @@ class VectorExpr(sp.Expr):
     is_symbol = False
     is_scalar = False
     is_commutative = True
+
+    is_Vector_Scalar = False
     
     def __new__(cls, *args, **kwargs):
-        args = map(sp.sympify, args)
-        return sp.Basic.__new__(cls, *args, **kwargs)
+        args = map(sympify, args)
+        return Basic.__new__(cls, *args, **kwargs)
     
     def equals(self, other):
         return self == other
@@ -45,15 +50,6 @@ class VectorExpr(sp.Expr):
             h = hash((type(self).__name__,) + self._hashable_content())
             self._mhash = h
         return h
-    
-    def _hashable_content(self):
-        """Return a tuple of information about self that can be used to
-        compute the hash. If a class defines additional attributes,
-        like ``name`` in Symbol, then this method should be updated
-        accordingly to return such relevant attributes.
-        Defining more than _hashable_content is necessary if __eq__ has
-        been defined by a class. See note about this in Basic.__eq__."""
-        return self._args
     
     def __eq__(self, other):
         if not isinstance(other, VectorExpr):
@@ -76,7 +72,7 @@ class VectorExpr(sp.Expr):
         return VecAdd(other, self, check=True)
     
     def __div__(self, other):
-        return self * other**sp.S.NegativeOne
+        return self * other**S.NegativeOne
 
     def __rdiv__(self, other):
         raise NotImplementedError()
@@ -85,7 +81,7 @@ class VectorExpr(sp.Expr):
     __rtruediv__ = __rdiv__
     
     def __neg__(self):
-        return VecMul(sp.S.NegativeOne, self, check=True)
+        return VecMul(S.NegativeOne, self, check=True)
     
     def __sub__(self, other):
         return VecAdd(self, -other, check=True)
@@ -103,7 +99,7 @@ class VectorExpr(sp.Expr):
         return VecMul(self, other, check=True)
 
     def __pow__(self, other):
-        if other == sp.S.One:
+        if other == S.One:
             return self
         return VecPow(self, other).doit(deep=False)
 
@@ -115,7 +111,7 @@ class VectorExpr(sp.Expr):
 
     # need the following twos for auto-diff evaluation
     def _eval_derivative_n_times(self, s, n):
-        return sp.Basic._eval_derivative_n_times(self, s, n)
+        return Basic._eval_derivative_n_times(self, s, n)
     
     def _accept_eval_derivative(self, s):
         return s._visit_eval_derivative_scalar(self)
@@ -134,12 +130,12 @@ class VectorExpr(sp.Expr):
         assumptions.setdefault("evaluate", True)
         # need an unevaluated derivative to check the number of 
         # differentiation symbols
-        d = sp.Derivative(self, *symbols)
-        if not isinstance(d, sp.Derivative):
+        d = Derivative(self, *symbols)
+        if not isinstance(d, Derivative):
             return self
         elif len(d.variable_count) > 1:
             raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-        d2 = sp.Derivative(self, *symbols, **assumptions)
+        d2 = Derivative(self, *symbols, **assumptions)
         return D(d2)
 
     def doit(self, **kwargs):
@@ -156,7 +152,7 @@ class VectorExpr(sp.Expr):
         if isinstance(self, Normalize):
             return self
         if not self.is_Vector:
-            return sp.Abs(self)
+            return Abs(self)
         n = Normalize(self)
         if evaluate:
             return n.doit()
@@ -169,7 +165,7 @@ class VectorExpr(sp.Expr):
     def magnitude(self):
         if self.is_Vector:
             return Magnitude(self)
-        return sp.Abs(self)
+        return Abs(self)
     
     @property
     def mag(self):
@@ -198,17 +194,76 @@ class VectorExpr(sp.Expr):
     @property
     def cu(self):
         return self.curl()
-    
+
+
+
+
+
+
+
+def get_postprocessor(cls):
+    def _postprocessor(expr):
+        vec_class = {Mul: VecMul, Add: VecAdd}[cls]
+        nonvectors = []
+        vectors = []
+        for term in expr.args:
+            if isinstance(term, VectorExpr):
+                vectors.append(term)
+            else:
+                nonvectors.append(term)
+        
+        if not vectors:
+            return cls._from_args(nonvectors)
+        
+        if nonvectors:
+            if cls == Mul:
+                for i in range(len(vectors)):
+                    if not vectors[i].is_VectorExpr:
+                        # If one of the matrices explicit, absorb the scalar into it
+                        # (doit will combine all explicit matrices into one, so it
+                        # doesn't matter which)
+                        vectors[i] = vectors[i].__mul__(cls._from_args(nonvectors))
+                        nonvectors = []
+                        break
+
+            else:
+                # Maintain the ability to create Add(scalar, matrix) without
+                # raising an exception. That way different algorithms can
+                # replace matrix expressions with non-commutative symbols to
+                # manipulate them like non-commutative scalars.
+                return cls._from_args(nonvectors + [vec_class(*vectors).doit(deep=False)])
+        
+        
+        if vec_class == VecAdd:
+            asd = vec_class(*vectors).doit(deep=False)
+            return asd
+        asd = vec_class(cls._from_args(nonvectors), *vectors).doit(deep=False)
+        return asd
+    return _postprocessor
+
+
+Basic._constructor_postprocessor_mapping[VectorExpr] = {
+    "Mul": [get_postprocessor(Mul)],
+    "Add": [get_postprocessor(Add)],
+}
+
+
+
+
+
+
+
+
 class VectorSymbol(VectorExpr):
     is_symbol = True
     is_Vector = True
-    
+
     def __new__(cls, name, **kwargs):
-        if not isinstance(name, (string_types, sp.Symbol, VectorSymbol)):
+        if not isinstance(name, (string_types, Symbol, VectorSymbol)):
             raise TypeError("'name' must be a string or a Symbol or a VectorSymbol")
         if isinstance(name, string_types):
-            name = sp.Symbol(name)
-        obj = sp.Basic.__new__(cls, name)
+            name = Symbol(name)
+        obj = Basic.__new__(cls, name)
 
         # Attributes for the latex printer.
         # if _vec_symbol="" or _unit_vec_symbol="", the printer will use its
@@ -240,7 +295,7 @@ class VectorZero(VectorSymbol):
         return super().__new__(cls, "0", **kwargs)
     
     def magnitude(self):
-        return sp.S.Zero
+        return S.Zero
     
     def normalize(self):
         return self
@@ -248,7 +303,6 @@ class VectorZero(VectorSymbol):
     def _eval_derivative(self, s):
         return self
 
-# class VectorOne(with_metaclass(Singleton, VectorSymbol)):
 class VectorOne(VectorSymbol):
     def __new__(cls, **kwargs):
         return super().__new__(cls, "1", **kwargs)
@@ -259,8 +313,6 @@ class VectorOne(VectorSymbol):
 VectorSymbol.zero = VectorZero()
 VectorSymbol.one = VectorOne()
 
-
-# class Nabla(with_metaclass(Singleton, VectorSymbol)):
 class Nabla(VectorSymbol):
     def __new__(cls, **kwargs):
         return super().__new__(cls, r"\nabla", **kwargs)
@@ -279,7 +331,7 @@ class Normalize(VectorExpr):
     is_Vector = True
 
     def __new__(cls, v):
-        v = sp.sympify(v)
+        v = sympify(v)
         if isinstance(v, Normalize):
             return v
         if not isinstance(v, (VectorExpr, Vector)):
@@ -288,7 +340,7 @@ class Normalize(VectorExpr):
             raise TypeError("VectorExpr must be a vector, not a scalar.")
         if isinstance(v, (Nabla, VectorZero)):
             return v.norm
-        return sp.Basic.__new__(cls, v)
+        return Basic.__new__(cls, v)
     
     def doit(self, **kwargs):
         deep = kwargs.get('deep', True)
@@ -305,22 +357,23 @@ class Normalize(VectorExpr):
 class Magnitude(VectorExpr):
     is_Vector = False
     is_Norm = True
-    is_scalar = True
     is_positive = True
 
+    is_Vector_Scalar = True
+
     def __new__(cls, v):
-        v = sp.sympify(v)
+        v = sympify(v)
         if isinstance(v, Magnitude):
             return v
         if not isinstance(v, (VectorExpr, Vector)):
             # for example, v is a number, or symbol
-            return sp.Abs(v)
+            return Abs(v)
         if not v.is_Vector:
             # for example, dot-product of two VectorSymbol
-            return sp.Abs(v)
+            return Abs(v)
         if isinstance(v, Nabla):
             return v.mag
-        return sp.Basic.__new__(cls, v)
+        return Basic.__new__(cls, v)
     
     def doit(self, **kwargs):
         deep = kwargs.get('deep', True)
@@ -331,37 +384,6 @@ class Magnitude(VectorExpr):
         if isinstance(args[0], Vector):
             return args[0].magnitude()
         return self.func(*args)
-    
-    def diff(self, *symbols, **assumptions):
-        """
-        TODO:
-
-        Here comes the problem: I'm using is_scalar and is_Vector to distinguish
-        between scalar and vector quantities (scalar related to vectors, ie 
-        dot-product, magnitude, ...).
-        However, is_scalar is also used by sp.Derivative: if the expression is 
-        scalar and the differentiation symbol is different from the expression, 
-        it will return 0, which is wrong in this case: for what we know, 
-        magnitude is an expression containing also the differentiation symbol.
-        Hence, need to override the diff method.
-        
-        See if it's possible to create a different property instead of using 
-        is_scalar, for example is_Vector_scalar.
-        Note: in VecAdd, VecMul, VecPow we will need to consider both the new 
-        property as well as  is_scalar (used by standard symbolic expressions) 
-        to decide if the resulting expression is a vector or a scalar.
-        """
-        evaluate = assumptions.get('evaluate', True)
-        d = sp.Derivative(self, *symbols)
-        if not isinstance(d, sp.Derivative):
-            return self
-        elif len(d.variable_count) > 1:
-            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-        if evaluate:
-            if self.args[0] == VectorOne():
-                return VectorZero()
-            return D(d)
-        return D(d)
 
 class D(VectorExpr):
     """ Represent an unevaluated derivative.
@@ -371,8 +393,8 @@ class D(VectorExpr):
     which may be a bug), it is not possible to set this attribute to objects of 
     type  Add (read-only property). If v1 and v2 are two vector expression 
     with is_Vector=True:
-        d = sp.Derivative(v1 + v2, x).doit()
-    will return Add(sp.Derivative(v1, x), sp.Derivative(v2, x)), with 
+        d = Derivative(v1 + v2, x).doit()
+    will return Add(Derivative(v1, x), Derivative(v2, x)), with 
     is_Vector=False, which is wrong, preventing from further vector expression 
     operations. For example, VecCross(v1, d) will fail because 
     d.is_Vector=False.
@@ -382,69 +404,44 @@ class D(VectorExpr):
     is_Vector = False
 
     def __new__(cls, d):
-        d = sp.sympify(d)
-        if not isinstance(d, sp.Derivative):
+        d = sympify(d)
+        if not isinstance(d, Derivative):
             return d
         
-        obj = sp.Basic.__new__(cls, d)
+        obj = Basic.__new__(cls, d)
         obj.is_Vector = d.expr.is_Vector
-        obj.is_scalar = d.expr.is_scalar
+        obj.is_Vector_Scalar = not d.expr.is_Vector
         return obj
     
-    def diff(self, *symbols, **assumptions):
-        # need to override this method because basic auto eval failed with:
-        # RecursionError: maximum recursion depth exceeded while calling a Python object
-        # in this example:
-        # D((v1 + v2).diff(x, evaluate=False)).diff(x)
+    def _eval_derivative(self, s):
+        d = self.args[0]
+        variable_count = list(d.variable_count) + [(s, 1)]
+        return D(Derivative(d.expr, *variable_count))
 
-        # need an unevaluated derivative to check the number of 
-        # differentiation symbols
-        d0 = self.args[0]
-        d1 = sp.Derivative(self.args[0].expr, *symbols)
-        if not isinstance(d1, sp.Derivative):
-            # there are times where this method is called with variable_count
-            # set to (x, 0). For example, (2 * v1.diff(x)).diff(x)
-            # This 'if' appears to solve the problem....
-            return self
-
-        variable_count = list(d0.variable_count) + list(d1.variable_count)
-        d = sp.Derivative(self.args[0].expr, *variable_count)
-        if not isinstance(d, sp.Derivative):
-            return self
-        elif len(d.variable_count) > 1:
+    def _eval_derivative_n_times(self, s, n):
+        d = self.args[0]
+        variable_count = list(d.variable_count) + [(s, n)]
+        d = Derivative(d.expr, *variable_count)
+        if len(d.variable_count) > 1:
             raise NotImplementedError("Vector differentiation with multiple variables not implemented")
         return D(d)
-    
-    # def _eval_derivative(self, s):
-    #     d = self.args[0]
-    #     variable_count = list(d.variable_count) + [(s, 1)]
-    #     return D(sp.Derivative(d.expr, *variable_count))
-
-    # def _eval_derivative_n_times(self, s, n):
-    #     d = self.args[0]
-    #     variable_count = list(d.variable_count) + [(s, n)]
-    #     d = sp.Derivative(d.expr, *variable_count)
-    #     if len(d.variable_count) > 1:
-    #         raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-    #     return D(d)
 
 class VecDot(VectorExpr):
     is_Dot = True
-    is_scalar = True
-    is_Mul = False
+    is_Vector_Scalar = True
     
     def __new__(cls, expr1, expr2, **kwargs):
-        expr1 = sp.sympify(expr1)
-        expr2 = sp.sympify(expr2)
+        expr1 = sympify(expr1)
+        expr2 = sympify(expr2)
 
         check = lambda x: isinstance(x, (VectorExpr, Vector))
         if not (check(expr1) and check(expr2) and \
             expr1.is_Vector and expr2.is_Vector):
             raise TypeError("Both side of the dot-operator must be vectors")
         if expr1 == VectorZero() or expr2 == VectorZero():
-            return sp.S.Zero
+            return S.Zero
     
-        obj = sp.Expr.__new__(cls, expr1, expr2)
+        obj = Expr.__new__(cls, expr1, expr2)
         return obj
     
     @property
@@ -471,26 +468,16 @@ class VecDot(VectorExpr):
             return VecPow(args[0].mag, 2)
         return self.func(*args)
     
-    def diff(self, *symbols, **assumptions):
-        """
-        NOTE: see Magnitude.diff comment to understand why I need to overwrite
-        this method.
-        """
-        d = sp.Derivative(self, *symbols)
-        if not isinstance(d, sp.Derivative):
-            return self
-        elif len(d.variable_count) > 1:
-            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-        
-        evaluate = assumptions.get('evaluate', True)
-        if evaluate:
-            s, n = d.variable_count[0]
-            result = _diff_cross_dot(self, s)
-            while n > 1:
-                result = result.diff(s)
-                n -= 1
-            return result
-        return D(d)
+    def _eval_derivative(self, s):
+        return _diff_cross_dot(self, s)
+    
+    def _eval_derivative_n_times(self, s, n):
+        result = _diff_cross_dot(self, s)
+        while n > 1:
+            result = result.diff(s)
+            n -= 1
+        return result
+
 
 """
 TODO:
@@ -505,11 +492,10 @@ class VecCross(VectorExpr):
     is_Cross = True
     is_Vector = True
     is_commutative = False
-    is_Mul = False
     
     def __new__(cls, expr1, expr2):
-        expr1 = sp.sympify(expr1)
-        expr2 = sp.sympify(expr2)
+        expr1 = sympify(expr1)
+        expr2 = sympify(expr2)
 
         check = lambda x: isinstance(x, (VectorExpr, Vector))
         if not (check(expr1) and check(expr2) and \
@@ -525,7 +511,7 @@ class VecCross(VectorExpr):
         if expr1 == expr2:
             return VectorZero()
 
-        obj = sp.Expr.__new__(cls, expr1, expr2)
+        obj = Expr.__new__(cls, expr1, expr2)
         return obj
     
     @property
@@ -550,24 +536,15 @@ class VecCross(VectorExpr):
             args = [arg.doit(**kwargs) for arg in self.args]
         return self.func(*args)
     
-    def diff(self, *symbols, **assumptions):
-        # assumptions.setdefault("evaluate", True)
-        evaluate = assumptions.get('evaluate', True)
-        # need an unevaluated derivative to check the number of 
-        # differentiation symbols
-        d = sp.Derivative(self, *symbols)
-        if not isinstance(d, sp.Derivative):
-            return self
-        elif len(d.variable_count) > 1:
-            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-        if evaluate:
-            s, n = d.variable_count[0]
-            result = _diff_cross_dot(self, s)
-            while n > 1:
-                result = result.diff(s)
-                n -= 1
-            return result
-        return D(sp.Derivative(self, *symbols, **assumptions))
+    def _eval_derivative(self, s):
+        return _diff_cross_dot(self, s)
+    
+    def _eval_derivative_n_times(self, s, n):
+        result = _diff_cross_dot(self, s)
+        while n > 1:
+            result = result.diff(s)
+            n -= 1
+        return result
 
 """
 TODO: probably best to create a base class for VecDot, VecCross and put this 
@@ -585,35 +562,30 @@ def _diff_cross_dot(expr, s):
     t2 = expr.func(expr.args[0], expr1)
     return t1 + t2
 
-"""
-In a perfect world I would be happy to derive VecAdd from sp.Add,
-after all, it's an addition!
-If I do that, I would have problems with n-th derivatives.
-Consider the following code:
+# used for debugging the expressions trees
+_spaces = []
+_token = "    "
+def debug(*args):
+    print("".join(_spaces), *args)
 
-def _eval_derivative_n_times(self, s, n):
-    result = self
-    for i in range(n):
-        result = result._eval_derivative(s)
-    print(type(result))     # VecAdd
-    return result
 
-The print statement would clearly show that result is of type VecAdd, hovewer
-the returned type would be sp.Add. Why? Seems like the result is intercepted by
-some other function and post-processed. I don't which function....
+def _check_if_scalar(expr):
+    """
+    Ordinary symbols, numbers, ... are scalars. On the other hand, VectorExpr
+    can contains both vectors and scalars. Because instances of the class Vector
+    are also scalars, VectorExpr exposes the property is_Vector_Scalar to
+    differentiate between a vector quantity and a scalar quantity (still related
+    to the vector, for example the magnitude)
+    """
+    if hasattr(expr, "is_Vector_Scalar"):
+        return expr.is_Vector_Scalar
+    return expr.is_scalar
 
-Similarly, (v1 ^ v2).diff(x, 2) would return an instance of sp.Add, not VecAdd.
 
-Temporary solution: discard the hierarchy from sp.Add, derives directly from
-AssocOp. Now n-th derivatives return VecAdd, but no simplification is done over
-the arguments!
-"""
-
-class VecAdd(VectorExpr):
-# class VecAdd(VectorExpr, sp.Add):
+# class VecAdd(VectorExpr):
+class VecAdd(VectorExpr, Add):
     is_VecAdd = True
     is_commutative = True
-    is_Add = True
     
     def __new__(cls, *args, **kwargs):
         check = kwargs.get('check', True)
@@ -622,16 +594,16 @@ class VecAdd(VectorExpr):
         if not args:
             return VectorZero()
 
-        args = list(map(sp.sympify, args))
+        args = list(map(sympify, args))
         if len(args) == 1:
             # doesn't make any sense to have 1 argument in VecAdd if 
             # evaluate=True
             return args[0]
 
         if evaluate:
-            # remove instances of sp.S.Zero and VectorZero
+            # remove instances of S.Zero and VectorZero
             args = [a for a in args 
-                if not (isinstance(a, VectorZero) or (a == sp.S.Zero))]
+                if not (isinstance(a, VectorZero) or (a == S.Zero))]
             
             if len(args) == 0:
                 return VectorZero()
@@ -642,30 +614,37 @@ class VecAdd(VectorExpr):
 
             # Create a new object of type VecAdd. By calling  Basic.__new__ we  
             # avoid infinite loop.
-            obj = Basic.__new__(cls, *args)
+            obj = Basic.__new__(cls, *args)            
             # flatten the expression. For example: 
             # VecAdd(v1, VecAdd(v2, v1))
             # becomes: VecAdd(v1, v2, v1)
             obj = flatten(obj)
             args = _sanitize_args(obj.args)
-            args = _custom_flatten(cls, args)
+            c_part, nc_part, order_symbols = Add.flatten(args)
+            args = c_part + nc_part
+            args = _sanitize_args(args)
+            is_commutative = not nc_part
 
-        # create the final object representing this VecAdd
-        obj = Basic.__new__(cls, *args)
+            if len(args) == 1:
+                return args[0]
+        else:
+            # TODO: addition is not commutative if an argument is not commutative!!!
+            is_commutative = True
 
-        # TODO: addition is not commutative if an argument is not commutative!!!
-        obj.is_commutative = True
+        # # TODO: addition is not commutative if an argument is not commutative!!!
+        # obj.is_commutative = True
+        obj = cls._from_args(args, is_commutative)
 
         # TODO: do I need this???
         # if there is only one argument and it was 1, then obj is the number
         # one, whose property is_Vector is hidden, therefore return 1 immediatly
-        if isinstance(obj, sp.Number):
+        if isinstance(obj, Number):
             return VectorZero()
         
         # are there any scalars or vectors?
         are_vectors = any([a.is_Vector for a in args])
         # as of Sympy version 1.5.1, an instance of Vector has is_scalar=True
-        are_scalars = any([a.is_scalar for a in args 
+        are_scalars = any([_check_if_scalar(a) for a in args 
             if not isinstance(a, Vector)])
         
         # addition of mixed scalars and vectors is not supported.
@@ -673,35 +652,17 @@ class VecAdd(VectorExpr):
         # are scalars (hence not a vector expression) or there are
         # mixed arguments, hence throw an error
         obj.is_Vector = not are_scalars
-        obj.is_scalar = not obj.is_Vector
+        obj.is_Vector_Scalar = not obj.is_Vector
 
         if check:
             if all(not isinstance(i, (VectorExpr, Vector)) for i in args):
-                return sp.Add.fromiter(args)
+                return Add.fromiter(args)
             if (are_vectors and are_scalars):
                 raise TypeError("Mix of Vector and Scalar symbols")
         return obj
     
     def _eval_derivative(self, s):
         return self.func(*[a.diff(s) for a in self.args])
-    
-    def diff(self, *symbols, **assumptions):
-        evaluate = assumptions.get('evaluate', True)
-        # need an unevaluated derivative to check the number of 
-        # differentiation symbols
-        d = sp.Derivative(self, *symbols)
-        if not isinstance(d, sp.Derivative):
-            return self
-        elif len(d.variable_count) > 1:
-            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-        if evaluate:
-            s, n = d.variable_count[0]
-            res = self._eval_derivative(s)
-
-            for i in range(n - 1):
-                res = res.diff(s)
-            return res
-        return D(sp.Derivative(self, *symbols, **assumptions))
 
     def doit(self, **kwargs):
         # Need to override this method in order to apply the rules defined
@@ -712,79 +673,6 @@ class VecAdd(VectorExpr):
         else:
             args = self.args
         return canonicalize(VecAdd(*args))
-
-# "necessary" since it doesn't derive from Add.
-VecAdd.identity = sp.S.Zero
-
-def _custom_flatten(cls, args):
-    """
-    Apply Add.flatten() or Mul.flatten() accordingly to the `cls`
-    parameter.
-    """
-    # Because of the way Add.flatten() or Mul.flatten() are coded, they tend 
-    # to not work very well with custom types. We have to work around the 
-    # problems: `flatten` methods knows how to deal with ordinary symbols.
-
-    # TODO: by excluding numbers and symbols from the following substitution,
-    # we might spare ourselves the last step of this method!!!
-
-    # Associate each unique argument to a different dummy symbol.
-    # subs_dict_fw is used to go from custom types to dummy symbols.
-    # subs_dict_bw is used to go from dummy symbols back to custom types.
-    subs_dict_fw = {}
-    subs_dict_bw = {}
-    set_args = list(set(args))
-    for a in set_args:
-        d = sp.Dummy()
-        subs_dict_fw[a] = d
-        subs_dict_bw[d] = a
-    # dummy args
-    d_args = [subs_dict_fw[a] for a in args]
-
-    cls_map = {
-        VecAdd: sp.Add,
-        VecMul: sp.Mul
-    }
-    # apply the correct flatten method
-    c_part, nc_part, order_symbols = cls_map[cls].flatten(d_args)
-    d_args = c_part + nc_part
-
-    # substitute back the custom types
-    args = []
-    for a in d_args:
-        # `flatten` may group arguments togheter. For example, if we are dealing
-        # with VecAdd and the dummy arguments are [dummy_1, dummy_2, dummy_1]
-        # after the `flatten` operation we end up with [2 * dummy_1, dummy_2]
-        # Note, (2 * dummy_1) is of type Mul. If we were to use the method 
-        # `subs`, it would fail due to "RecursionError: maximum recursion depth 
-        # exceeded while calling a Python object", because our custom
-        # type is not compatible with Mul. Hence, need to reconstruct the 
-        # expression with VecMul.
-        if isinstance(a, sp.Dummy):
-            args.append(subs_dict_bw[a])
-        elif isinstance(a, sp.Mul):
-            coeff, mul = a.as_coeff_mul()
-            args.append(VecMul(coeff, subs_dict_bw[mul[0]]))
-        else:
-            # deal with Pow objects
-            args.append(a.subs(subs_dict_bw))
-            # raise NotImplementedError("_custom_flatten not implemented for arguments of type ", type(a))
-    
-    # because every original argument was substituted with a dummy symbol,
-    # even numbers and symbols, there might still be some simplification
-    # to be done.
-    not_ve_args = [a for a in args if not isinstance(a, VectorExpr)]    
-    ve_args = [a for a in args if isinstance(a, VectorExpr)]
-
-    if len(not_ve_args) > 0:
-        not_ve_args = cls_map[cls](*not_ve_args)
-        if isinstance(not_ve_args, cls_map[cls]):
-            not_ve_args = list(not_ve_args.args)
-        else:
-            not_ve_args = [not_ve_args]
-    args = not_ve_args + ve_args
-
-    return args
 
 
 from sympy.strategies import (rm_id, unpack, flatten, sort, condition,
@@ -828,11 +716,10 @@ canonicalize = exhaust(condition(lambda x: isinstance(x, VecAdd),
                                  do_one(*rules)))
 
 
-class VecMul(VectorExpr):
-# class VecMul(VectorExpr, sp.Mul):
+# class VecMul(VectorExpr):
+class VecMul(VectorExpr, Mul):
     is_VecMul = True
     is_commutative = True
-    # is_Mul = True
     
     def __new__(cls, *args, **kwargs):
         check = kwargs.get('check', True)
@@ -841,7 +728,7 @@ class VecMul(VectorExpr):
         if not args:
             return VectorOne()
         
-        args = list(map(sp.sympify, args))
+        args = list(map(sympify, args))
         if len(args) == 1:
             # doesn't make any sense to have 1 argument in VecAdd if 
             # evaluate=True
@@ -852,47 +739,50 @@ class VecMul(VectorExpr):
             raise TypeError("Multiplication of vector quantities not supported")
 
         if evaluate:
-            # remove instances of sp.S.One
+            # remove instances of S.One
             args = [a for a in args if a is not cls.identity]
             if len(args) == 0:
-                return sp.S.One
+                return S.One
             if len(args) == 1:
                 return args[0]
 
             # check if any vector is present
             args_is_vector = [a.is_Vector for a in args]
-            if any([a == sp.S.Zero for a in args]):
+            if any([a == S.Zero for a in args]):
                 if any(args_is_vector):
                     return VectorZero()
-                return sp.S.Zero
+                return S.Zero
             if any([isinstance(a, VectorZero) for a in args]):
                 return VectorZero()
 
             # Create a new object of type VecAdd. By calling  Basic.__new__ we  
             # avoid infinite loop.
             obj = Basic.__new__(cls, *args)
-            # flatten the expression. For example: 
-            # VecMul(v1.mag, VecMul(v2.mag, one))
-            # becomes: VecMul(v1.mag, v2.mag, one)
+
+            # flatten the expression tree
             obj = flatten(obj)
             args = _sanitize_args(obj.args)
-            args = _custom_flatten(cls, args)
+            # flatten the arguments
+            c_part, nc_part, order_symbols = Mul.flatten(args)
+            args = c_part + nc_part
+            args = _sanitize_args(args)
 
-            # in the case of multiplication, _custom_flatten may group arguments
-            # together. Think for example to:
+            # Mul.flatten may group arguments together. Think for example to:
             # VecMul(v1.mag, v1.mag) -> VecPow(v1.mag, 2)
             # Need to perform this check again.
             if len(args) == 1:
-                return args[0]
+                # the object coming out from flatten, even if it is VecAdd,
+                # it always have the property is_Vector=False... Need to enforce
+                # the proper value by recreating the object.
+                return args[0].func(*args[0].args)
+                # return args[0]
 
-        # create the final object representing this VecAdd
-        obj = Basic.__new__(cls, *args)
-        # addition is commutative
-        obj.is_commutative = not any([not a.is_commutative for a in args])
-        
+        is_commutative = not any([not a.is_commutative for a in args])
+        obj = cls._from_args(args, is_commutative)
+
         vectors = [a.is_Vector for a in args]
         cvectors = vectors.count(True)
-        scalars = [a.is_scalar for a in args]
+        scalars = [_check_if_scalar(a) for a in args]
         cscalars = scalars.count(True)
 
         # multiplication of vectors is not supported. If there are multiple
@@ -900,95 +790,63 @@ class VecMul(VectorExpr):
         # If all arguments are scalars, the resulting expression wil not
         # be a vector
         obj.is_Vector = cscalars != len(args)
-        obj.is_scalar = not obj.is_Vector
+        obj.is_Vector_Scalar = not obj.is_Vector
         
         if check:
             if cvectors > 1:
                 raise TypeError("Multiplication of vector quantities not supported")
             if all(not isinstance(a, VectorExpr) for a in args):
-                return sp.Mul.fromiter(args)
+                return Mul.fromiter(args)
         return obj
 
-    def diff(self, *symbols, **assumptions):
-        evaluate = assumptions.get('evaluate', True)
-        # need an unevaluated derivative to check the number of 
-        # differentiation symbols
-        d = sp.Derivative(self, *symbols)
-        if not isinstance(d, sp.Derivative):
-            return self
-        elif len(d.variable_count) > 1:
-            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-        if evaluate:
-            s, n = d.variable_count[0]
+    def _eval_derivative(self, s):
+        # adapted from Mul._eval_derivative
+        args = list(self.args)
+        terms = []
+        for i in range(len(args)):
+            d = args[i].diff(s)
+            if d:
+                # Note: reduce is used in step of Mul as Mul is unable to
+                # handle subtypes and operation priority:
+                terms.append(reduce(lambda x, y: x*y, 
+                    (args[:i] + [d] + args[i + 1:]), S.One))
+        return VecAdd.fromiter(terms)
+    
+    def _eval_derivative_n_times(self, s, n):
+        # adapted from Mul._eval_derivative_n_times
+        from sympy import Integer
+        from sympy.ntheory.multinomial import multinomial_coefficients_iterator
 
-            # adapted from Mul._eval_derivative_n_times
-            from sympy import Integer
-            from sympy.ntheory.multinomial import multinomial_coefficients_iterator
-
-            args = self.args
-            m = len(args)   
+        args = self.args
+        m = len(args)
+        if isinstance(n, (int, Integer)):
             # https://en.wikipedia.org/wiki/General_Leibniz_rule#More_than_two_factors
             terms = []
             for kvals, c in multinomial_coefficients_iterator(m, n):
                 p = VecMul(*[arg.diff((s, k)) for k, arg in zip(kvals, args)])
                 terms.append(c * p)
             return VecAdd(*terms)
-
-            for i in range(n - 1):
-                res = res.diff(s)
-            return res
-        return D(sp.Derivative(self, *symbols, **assumptions))
-
-    # def _eval_derivative(self, s):
-    #     # adapted from Mul._eval_derivative
-    #     args = list(self.args)
-    #     terms = []
-    #     for i in range(len(args)):
-    #         d = args[i].diff(s)
-    #         if d:
-    #             # Note: reduce is used in step of Mul as Mul is unable to
-    #             # handle subtypes and operation priority:
-    #             terms.append(reduce(lambda x, y: x*y, 
-    #                 (args[:i] + [d] + args[i + 1:]), sp.S.One))
-    #     return VecAdd.fromiter(terms)
-    
-    # def _eval_derivative_n_times(self, s, n):
-    #     # adapted from Mul._eval_derivative_n_times
-    #     from sympy import Integer
-    #     from sympy.ntheory.multinomial import multinomial_coefficients_iterator
-
-    #     args = self.args
-    #     m = len(args)
-    #     if isinstance(n, (int, Integer)):
-    #         # https://en.wikipedia.org/wiki/General_Leibniz_rule#More_than_two_factors
-    #         terms = []
-    #         for kvals, c in multinomial_coefficients_iterator(m, n):
-    #             p = VecMul(*[arg.diff((s, k)) for k, arg in zip(kvals, args)])
-    #             terms.append(c * p)
-    #         return VecAdd(*terms)
-    #     raise TypeError("Derivative order must be integer")
-
-VecMul.identity = sp.S.One
+        raise TypeError("Derivative order must be integer")
 
 class VecPow(VectorExpr):
     def __new__(cls, base, exp):
-        base = sp.S(base)
-        exp =  sp.S(exp)
+        base = S(base)
+        exp =  S(exp)
         if base.is_Vector:
             raise TypeError("Vector power not available")
         if not isinstance(base, VectorExpr):
             if isinstance(exp, VectorExpr) and exp.is_Vector:
                 raise TypeError("Vector exponent not available")
-            return sp.Pow(base, exp)
+            return Pow(base, exp)
         
-        if exp == sp.S.One:
+        if exp == S.One:
             return base
 
         obj = Basic.__new__(cls, base, exp)
         # at this point I know the base is an instance of VectorExpr with
         # is_Vector=False, hence is_scalar = True
         obj.is_Vector = False
-        obj.is_scalar = True
+        obj.is_Vector_Scalar = True
         return obj
 
     @property
@@ -999,25 +857,11 @@ class VecPow(VectorExpr):
     def exp(self):
         return self.args[1]
     
-    def diff(self, *symbols, **assumptions):
-        # assumptions.setdefault("evaluate", True)
-        evaluate = assumptions.get('evaluate', True)
-        # need an unevaluated derivative to check the number of 
-        # differentiation symbols
-        d = sp.Derivative(self, *symbols)
-        if not isinstance(d, sp.Derivative):
-            return self
-        elif len(d.variable_count) > 1:
-            raise NotImplementedError("Vector differentiation with multiple variables not implemented")
-        if evaluate:
-            return self._eval_derivative(d.variable_count[0][0])
-        return D(sp.Derivative(self, *symbols, **assumptions))
-    
     def _eval_derivative(self, s):
         # adapted from Pow._eval_derivative
         dbase = self.base.diff(s)
         dexp = self.exp.diff(s)
-        return self * (dexp * sp.log(self.base) + dbase * self.exp / self.base)
+        return self * (dexp * log(self.base) + dbase * self.exp / self.base)
 
 def _sanitize_args(args):
     """ If an instance of Add, Mul, Pow contains VectorExpr, substitute
@@ -1025,29 +869,30 @@ def _sanitize_args(args):
 
     flatten() may remove instances of VecMul. For example:
     v1 - v2 = VecAdd(v1, VecMul(-1, v2)) -> (after flatten) ->
-    = VecAdd(v1, sp.Mul(-1, v2))
+    = VecAdd(v1, Mul(-1, v2))
     This is obviously wrong because even if Mul has the property is_Vector,
     it is not updated with the value of VecMul.
     Solution: instead of rewriting flatten(), post process the result
     """
     args = list(args)
     for i, a in enumerate(args):
-        if isinstance(a, sp.Add):
+        if isinstance(a, Add):
             if any([isinstance(arg, VectorExpr) for arg in a.args]):
-                args[i] = a.replace(sp.Add, VecAdd)
+                args[i] = a.replace(Add, VecAdd)
                 args[i].is_Vector = any([isinstance(arg, VectorSymbol)
                     for arg in a.args])
-        if isinstance(a, sp.Mul):
+        if isinstance(a, Mul):
             if any([isinstance(arg, VectorExpr) for arg in a.args]):
-                args[i] = a.replace(sp.Mul, VecMul)
+                args[i] = a.replace(Mul, VecMul)
                 args[i].is_Vector = any([isinstance(arg, VectorSymbol)
                     for arg in a.args])
-        if isinstance(a, sp.Pow):
+        if isinstance(a, Pow):
             if any([isinstance(arg, VectorExpr) for arg in a.args]):
-                args[i] = a.replace(sp.Pow, VecPow)
+                args[i] = a.replace(Pow, VecPow)
                 args[i].is_Vector = any([isinstance(arg, VectorSymbol)
                     for arg in a.args])
     return args
+    
 
 
 # TODO:
