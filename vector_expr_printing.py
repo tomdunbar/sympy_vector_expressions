@@ -1,6 +1,6 @@
 import sympy as sp
 from sympy.core.function import _coeff_isneg
-from sympy.printing.latex import LatexPrinter, translate
+from sympy.printing.latex import LatexPrinter, translate, _between_two_numbers_p
 from sympy.printing.precedence import precedence_traditional, PRECEDENCE
 from sympy.printing.conventions import split_super_sub, requires_partial
 from vector_expr import (
@@ -117,47 +117,16 @@ class MyLatexPrinter(LatexPrinter):
 
             return result
         return vec_symbol % expr
-    
-    def _print_VecAdd(self, expr):
-        # print("_print_VecAdd", expr)
-
-        # NOTE: only needed if VecAdd doesn't derive from sp.Add
-        # return self._print_Add(sp.Add(*expr.args))
-        terms = list(expr.args)
-        tex = ""
-        for i, term in enumerate(terms):
-            if i == 0:
-                pass
-            elif _coeff_isneg(term):
-                tex += " - "
-                term = -term
-            else:
-                tex += " + "
-            term_tex = self._print(term)
-            if self._needs_add_brackets(term):
-                term_tex = r"\left(%s\right)" % term_tex
-            tex += term_tex
-        # print("VecAdd output", tex)
-        return tex
-
-    # def _print_VecAdd(self, expr):
-    #     print("_print_VecAdd", type(expr), expr)
-    #     # NOTE: only needed if VecAdd doesn't derive from sp.Add
-    #     return self._print_Add(sp.Add(*expr.args))
 
     def _print_VecDot(self, expr):
-        # print("_print_VecDot", type(expr), expr)
         expr1, expr2 = expr.args
-        s1 = _wrap(self, expr1, expr)
-        s2 = _wrap(self, expr2, expr)
-        return r"%s \cdot %s" % (s1, s2)
+        return r"%s \cdot %s" % (self.parenthesize(expr1, PRECEDENCE['Mul']),
+                                  self.parenthesize(expr2, PRECEDENCE['Mul']))
     
     def _print_VecCross(self, expr):
-        # print("_print_VecCross", type(expr), expr)
         expr1, expr2 = expr.args
-        s1 = _wrap(self, expr1, expr)
-        s2 = _wrap(self, expr2, expr)
-        return r"%s \times %s" % (s1, s2)
+        return r"%s \times %s" % (self.parenthesize(expr1, PRECEDENCE['Mul']),
+                                  self.parenthesize(expr2, PRECEDENCE['Mul']))
     
     def _print_Normalize(self, expr):
         v = expr.args[0]
@@ -174,95 +143,17 @@ class MyLatexPrinter(LatexPrinter):
     def _print_Magnitude(self, expr):
         v = expr.args[0]
         return r"\|%s\|" % self.parenthesize(v, precedence_traditional(expr), True)
-
-    # def _print_VecMul(self, expr):
-    #     print("_print_VecMul", expr)
-
-    #     parens = lambda x: self.parenthesize(x, precedence_traditional(expr),
-    #                                          False)
-    #     args = expr.args
-    #     if isinstance(args[0], sp.Mul):
-    #         args = args[0].as_ordered_factors() + list(args[1:])
-    #     else:
-    #         args = list(args)
-
-    #     if isinstance(expr, VecMul) and _coeff_isneg(expr):
-    #         if args[0] == -1:
-    #             args = args[1:]
-    #         else:
-    #             args[0] = -args[0]
-    #         return '- ' + ' '.join(map(parens, args))
-    #     else:
-    #         return ' '.join(map(parens, args))
-    
-    def _print_VecMul(self, expr):
-        # print("_print_VecMul", type(expr), len(expr.args), expr.args)
-        # parens = lambda x: self.parenthesize(x, precedence_traditional(expr),
-        #                                      False)
-        parens = lambda x: self.parenthesize(x, PRECEDENCE["Mul"])
-        
-        args = list(expr.args)
-        if len(args) == 0:
-            return ""
-
-        def asd(args):
-            is_neg = False
-            for i, a in enumerate(args):
-                if a.is_number and a.is_negative:
-                    args[i] = sp.Abs(a)
-                    is_neg = not is_neg
-            return args, is_neg
-
-        is_neg = False
-        # print("_print_Mul", args)
-        # args, is_neg = asd(args)
-        # print("_print_Mul", args, is_neg)
-        # tex = "- "
-
-
-        args_latex = []
-
-        for a in args:
-            if isinstance(a, VecAdd):
-                s = self._print_VecAdd(a)
-            elif isinstance(a, VecCross):
-                s = self._print_VecCross(a)
-            elif isinstance(a, VecDot):
-                s = self._print_VecDot(a)
-            else:
-                # if a == sp.S.One:
-                #     s = ""
-                # else:
-                #     s = parens(a)
-                s = parens(a)
-
-
-
-            # print("_print_VecMul ARG", type(a), a, s)
-            if isinstance(a, (VecDot, VecCross, VecAdd)):
-                s = r"\left(%s\right)" % s
-            args_latex.append(s)
-        
-        # print("_print_VecMul out:", ' '.join(args_latex))
-        if is_neg:
-            return "- " + ' '.join(args_latex)
-        return ' '.join(args_latex)
-        # if isinstance(expr, VecMul) and _coeff_isneg(expr):
-        #     if args[0] == -1:
-        #         args = args[1:]
-        #     else:
-        #         args[0] = -args[0]
-        #     return '- ' + ' '.join(map(parens, args))
-        # else:
-        #     return ' '.join(map(parens, args))
         
     def _print_VecPow(self, expr):
         base, exp = expr.base, expr.exp
         if exp == sp.S.NegativeOne:
-            return r"\frac{1}{%s}" % self.parenthesize(base, precedence_traditional(expr), True)
+            return r"\frac{1}{%s}" % self._print(base)
         else:
-            return r"\left(%s\right)^{%s}" % (
-                self.parenthesize(base, precedence_traditional(expr), True),
+            base_str = r"\left(%s\right)^{%s}"
+            if isinstance(base, Magnitude):
+                base_str = "%s^{%s}"
+            return base_str % (
+                self._print(base),
                 self.parenthesize(exp, precedence_traditional(expr), True),
             )
     
@@ -271,21 +162,148 @@ class MyLatexPrinter(LatexPrinter):
         return self._print_Derivative(expr.args[0])
     
     def _print_Derivative(self, expr):
-        # kind of an hack to wrap VectorExpression instances in parentheses
-        latex = super()._print_Derivative(expr)
-        expr_latex = None
-        if isinstance(expr.expr, VectorExpr):
-            expr_latex = self._print(expr.expr)
-        if expr_latex:
-            expr_wrapped = r"\left(%s\right)" % expr_latex
-            latex = latex.replace(expr_latex, expr_wrapped)
-        return latex
+        if requires_partial(expr.expr):
+            diff_symbol = r'\partial'
+        else:
+            diff_symbol = r'd'
 
-def _wrap(printer, e, expr):
-    s = printer.parenthesize(e, PRECEDENCE['Mul'])
-    # TODO: need to check the type of e to apply the correct need_brackets
-    if not isinstance(e, VectorSymbol):
-        if (e.is_Add and printer._needs_add_brackets(e) or
-            e.is_Mul and printer._needs_mul_brackets(e) ):
-            s = r"\left( %s \right)" % s
-    return s
+        tex = ""
+        dim = 0
+        for x, num in reversed(expr.variable_count):
+            dim += num
+            if num == 1:
+                tex += r"%s %s" % (diff_symbol, self._print(x))
+            else:
+                tex += r"%s %s^{%s}" % (diff_symbol,
+                                        self.parenthesize_super(self._print(x)),
+                                        self._print(num))
+        
+        put_into_num = False
+        if (isinstance(expr.expr, VectorSymbol) or 
+            (isinstance(expr.expr, Magnitude) and 
+            isinstance(expr.expr.args[0], VectorSymbol))):
+            put_into_num = True
+            latex_expr = self._print(expr.expr)
+        elif isinstance(expr.expr, (VecDot, VecCross, VecMul)):
+            latex_expr = r"\left(%s\right)" % self._print(expr.expr)
+        else:
+            latex_expr = self.parenthesize(
+            expr.expr,
+            PRECEDENCE["Mul"],
+            strict=True
+        )
+
+        if dim == 1:
+            if put_into_num:
+                return r"\frac{%s %s}{%s}" % (diff_symbol, latex_expr, tex)
+            return r"\frac{%s}{%s} %s" % (diff_symbol, tex, latex_expr)
+        else:
+            if put_into_num:
+                return r"\frac{%s^{%s} %s}{%s}" % (diff_symbol, self._print(dim), latex_expr, tex)
+            return r"\frac{%s^{%s}}{%s} %s" % (diff_symbol, self._print(dim), tex, latex_expr)
+
+    def _print_VecMul(self, expr):
+        # Almost identical to _print_Mul
+        from sympy.core.power import Pow
+        from sympy.physics.units import Quantity
+        include_parens = False
+        if _coeff_isneg(expr):
+            expr = -expr
+            tex = "- "
+            if expr.is_Add:
+                tex += "("
+                include_parens = True
+        else:
+            tex = ""
+
+        from sympy.simplify import fraction
+        numer, denom = fraction(expr, exact=True)
+        separator = self._settings['mul_symbol_latex']
+        numbersep = self._settings['mul_symbol_latex_numbers']
+
+        def convert(expr):
+            if not expr.is_Mul:
+                return str(self._print(expr))
+            else:
+                _tex = last_term_tex = ""
+
+                if self.order not in ('old', 'none'):
+                    args = expr.as_ordered_factors()
+                else:
+                    args = list(expr.args)
+
+                # If quantities are present append them at the back
+                args = sorted(args, key=lambda x: isinstance(x, Quantity) or
+                              (isinstance(x, Pow) and
+                               isinstance(x.base, Quantity)))
+
+                for i, term in enumerate(args):
+                    term_tex = self._print(term)
+
+                    # NOTE: only difference wrt _print_Mul
+                    if (self._needs_mul_brackets(term, first=(i == 0),
+                                                last=(i == len(args) - 1))
+                        or isinstance(term, (VecCross, VecDot))):
+                        term_tex = r"\left(%s\right)" % term_tex
+
+                    if _between_two_numbers_p[0].search(last_term_tex) and \
+                            _between_two_numbers_p[1].match(term_tex):
+                        # between two numbers
+                        _tex += numbersep
+                    elif _tex:
+                        _tex += separator
+
+                    _tex += term_tex
+                    last_term_tex = term_tex
+                return _tex
+
+        if denom is sp.S.One and Pow(1, -1, evaluate=False) not in expr.args:
+            # use the original expression here, since fraction() may have
+            # altered it when producing numer and denom
+            tex += convert(expr)
+
+        else:
+            snumer = convert(numer)
+            sdenom = convert(denom)
+            ldenom = len(sdenom.split())
+            ratio = self._settings['long_frac_ratio']
+            if self._settings['fold_short_frac'] and ldenom <= 2 and \
+                    "^" not in sdenom:
+                # handle short fractions
+                if self._needs_mul_brackets(numer, last=False):
+                    tex += r"\left(%s\right) / %s" % (snumer, sdenom)
+                else:
+                    tex += r"%s / %s" % (snumer, sdenom)
+            elif ratio is not None and \
+                    len(snumer.split()) > ratio*ldenom:
+                # handle long fractions
+                if self._needs_mul_brackets(numer, last=True):
+                    tex += r"\frac{1}{%s}%s\left(%s\right)" \
+                        % (sdenom, separator, snumer)
+                elif numer.is_Mul:
+                    # split a long numerator
+                    a = sp.S.One
+                    b = sp.S.One
+                    for x in numer.args:
+                        if self._needs_mul_brackets(x, last=False) or \
+                                len(convert(a*x).split()) > ratio*ldenom or \
+                                (b.is_commutative is x.is_commutative is False):
+                            b *= x
+                        else:
+                            a *= x
+                    if self._needs_mul_brackets(b, last=True):
+                        tex += r"\frac{%s}{%s}%s\left(%s\right)" \
+                            % (convert(a), sdenom, separator, convert(b))
+                    else:
+                        tex += r"\frac{%s}{%s}%s%s" \
+                            % (convert(a), sdenom, separator, convert(b))
+                else:
+                    tex += r"\frac{1}{%s}%s%s" % (sdenom, separator, snumer)
+            else:
+                tex += r"\frac{%s}{%s}" % (snumer, sdenom)
+
+        if include_parens:
+            tex += ")"
+        return tex
+
+

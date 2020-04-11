@@ -291,8 +291,8 @@ class VectorSymbol(VectorExpr):
 class VectorZero(VectorSymbol):
     is_ZeroVector = True
     
-    def __new__(cls, **kwargs):
-        return super().__new__(cls, "0", **kwargs)
+    def __new__(cls, name="0", **kwargs):
+        return super().__new__(cls, name, **kwargs)
     
     def magnitude(self):
         return S.Zero
@@ -304,8 +304,8 @@ class VectorZero(VectorSymbol):
         return self
 
 class VectorOne(VectorSymbol):
-    def __new__(cls, **kwargs):
-        return super().__new__(cls, "1", **kwargs)
+    def __new__(cls, name="1", **kwargs):
+        return super().__new__(cls, name, **kwargs)
     
     def _eval_derivative(self, s):
         return VectorZero()
@@ -774,6 +774,7 @@ class VecMul(VectorExpr, Mul):
                 # the object coming out from flatten, even if it is VecAdd,
                 # it always have the property is_Vector=False... Need to enforce
                 # the proper value by recreating the object.
+                # print("VecMul", type(args[0]), args[0], args[0].args)
                 return args[0].func(*args[0].args)
                 # return args[0]
 
@@ -892,9 +893,3 @@ def _sanitize_args(args):
                 args[i].is_Vector = any([isinstance(arg, VectorSymbol)
                     for arg in a.args])
     return args
-    
-
-
-# TODO:
-# *. find out why class VecAdd(Add) returns Add objects, not VecAdd
-# *. printing of (v1 + (v1 ^ one) * (v1 & v2))
