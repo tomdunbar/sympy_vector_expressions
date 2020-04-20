@@ -22,7 +22,8 @@ class test_VecMul(u.TestCase, CommonTest):
 
     def test_creation(self):
         # no args
-        assert VecMul() == VectorOne()
+        assert VecMul() == S.One
+        # assert VecMul() == VectorOne()
         # 1 arg
         assert VecMul(self.one) == VectorOne()
         assert VecMul(1) == S.One

@@ -1,4 +1,4 @@
-from sympy import symbols
+from sympy import symbols, preorder_traversal
 from sympy.vector import CoordSys3D, Vector, VectorZero as VZero, curl, divergence
 
 import os,sys,inspect
@@ -33,3 +33,37 @@ class CommonTest:
         if len(args1 - args2) == 0:
             return True
         return False
+    
+    def _assert_vecadd(self, expr):
+        """ 
+        """
+        assert expr.is_Vector
+        assert not expr.is_Vector_Scalar
+        for a in expr.args:
+            assert a.is_Vector
+            assert not a.is_Vector_Scalar
+    
+    def _assert_expr_tree(self, expr, is_Vector=True):
+        """ Parse the expression tree, select the arguments of type VecAdd, 
+        VecMul, VecPow, VecCross, D and look for consistency in the is_Vector 
+        and is_Vector_Scalar properties.
+
+        Parameters
+        ----------
+            expr : the expression to parse
+            is_Vector : the expected value of the expr.is_Vector
+        """
+        assert expr.is_Vector == is_Vector
+        assert expr.is_Vector_Scalar == (not is_Vector)
+
+        if isinstance(expr, VecAdd):
+            
+            for arg in expr.args:
+                pass
+
+
+        for arg in preorder_traversal(expr):
+            pass
+    
+    def d(self, expr):
+        print("DEBUG", type(expr), expr)

@@ -120,14 +120,16 @@ class MyLatexPrinter(LatexPrinter):
 
     def _print_VecDot(self, expr):
         expr1, expr2 = expr.args
-        return r"%s \cdot %s" % (self.parenthesize(expr1, PRECEDENCE['Mul']),
-                                  self.parenthesize(expr2, PRECEDENCE['Mul']))
-    
+        s1 = _wrap_cross_dot_arg(self, expr1)
+        s2 = _wrap_cross_dot_arg(self, expr2)
+        return r"%s \cdot %s" % (s1, s2)
+
     def _print_VecCross(self, expr):
         expr1, expr2 = expr.args
-        return r"%s \times %s" % (self.parenthesize(expr1, PRECEDENCE['Mul']),
-                                  self.parenthesize(expr2, PRECEDENCE['Mul']))
-    
+        s1 = _wrap_cross_dot_arg(self, expr1)
+        s2 = _wrap_cross_dot_arg(self, expr2)
+        return r"%s \times %s" % (s1, s2)
+
     def _print_Normalize(self, expr):
         v = expr.args[0]
         style = self._settings["normalize_style"]
@@ -306,4 +308,17 @@ class MyLatexPrinter(LatexPrinter):
             tex += ")"
         return tex
 
+    def _print_WildVectorSymbol(self, expr):
+        return self._print_VectorSymbol(expr)
 
+def _wrap_cross_dot_arg(printer, expr):
+    s = printer._print(expr)
+    wrap = False
+    if isinstance(expr, D) and isinstance(expr.args[0].expr, VectorSymbol):
+        wrap = False
+    elif not isinstance(expr, VectorSymbol):
+        wrap = True
+    
+    if wrap:
+        s = r"\left(%s\right)" % s
+    return s
