@@ -135,24 +135,24 @@ class test_Derivatives(u.TestCase, CommonTest):
         with self.assertRaises(NotImplementedError) as context:
             VecDot(self.v1, self.v2).diff(x, y)
     
-    # def test_veccross(self):
-    #     expr = VecCross(self.v1, self.v2)
-    #     assert isinstance(expr.diff(x), VecAdd)
-    #     assert isinstance(expr.diff(x, evaluate=False), D)
-    #     assert self._check_args(
-    #         expr.diff(x),
-    #         (self.v1.diff(x) ^ self.v2) + (self.v1 ^ self.v2.diff(x))
-    #     )
+    def test_veccross(self):
+        expr = VecCross(self.v1, self.v2)
+        assert isinstance(expr.diff(x), VecAdd)
+        assert isinstance(expr.diff(x, evaluate=False), D)
+        assert self._check_args(
+            expr.diff(x),
+            (self.v1.diff(x) ^ self.v2) + (self.v1 ^ self.v2.diff(x))
+        )
 
-    #     # partial differentiation not implemented
-    #     with self.assertRaises(NotImplementedError) as context:
-    #         VecCross(self.v1, self.v2).diff(x, y)
+        # partial differentiation not implemented
+        with self.assertRaises(NotImplementedError) as context:
+            VecCross(self.v1, self.v2).diff(x, y)
         
-    # def test_d(self):
-    #     expr = self.v1.diff(x)
-    #     assert expr.diff(x, 3).args[0].variable_count[0][1] == 4
-    #     expr = (self.v1 + self.v2).diff(x, 2, evaluate=False)
-    #     assert expr.diff(x, 3).args[0].variable_count[0][1] == 5
+    def test_d(self):
+        expr = self.v1.diff(x)
+        assert expr.diff(x, 3).args[0].variable_count[0][1] == 4
+        expr = (self.v1 + self.v2).diff(x, 2, evaluate=False)
+        assert expr.diff(x, 3).args[0].variable_count[0][1] == 5
 
 if __name__ == "__main__":
     u.main()

@@ -18,6 +18,7 @@ class test_VecPow(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
+        assert VecPow(1, self.v1.mag) == S.One
         assert isinstance(VecPow(x, 1), Symbol)
         assert isinstance(VecPow(x, 2), Pow)
         assert isinstance(VecPow(3, 2), Integer)
@@ -47,6 +48,15 @@ class test_VecPow(u.TestCase, CommonTest):
         func(2, self.v1)
         func(2, self.v1 ^ self.v2)
         func(2, self.v1.norm)
+
+        # base is not instance of VectorExpr
+        assert isinstance(VecPow(2, self.v1.mag), VecPow)
+        assert isinstance(VecPow(x, self.v1.mag), VecPow)
+
+        # base and exp are instances of VectorExpr with is_Vector=False
+        assert isinstance(VecPow(self.v1.mag, self.v1.mag), VecPow)
+        assert isinstance(VecPow(self.v1.mag, (self.v1 & self.v2)), VecPow)
+
     
     def test_doit(self):
         expr = VecPow(VecDot(self.vn1, self.vn2), self.v1.mag)

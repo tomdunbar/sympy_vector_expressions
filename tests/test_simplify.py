@@ -13,7 +13,7 @@ from vector_expr import (
 )
 
 from vector_simplify import (
-    bac_cab_backward, bac_cab_forward, find_bac_cab,
+    bac_cab_backward, bac_cab_forward, find_bac_cab, bac_cab,
     dot_cross, collect, collect_cross_dot, simplify
 )
 
@@ -59,7 +59,7 @@ class test_Simplify(u.TestCase, CommonTest):
             VecMul(-1, (4 * c + 4 * d), evaluate=False) * ((a - b) & (3 * b)) + (3 * ((a - b) & (4 * c + 4 * d)) * b)
         )
 
-        # nested triple-cross-products
+        # nested cross-products
         expr = (a ^ (b ^ (c ^ (d ^ e))))
         sexpr = bac_cab_forward(expr)
         assert self._check_args(
@@ -161,6 +161,55 @@ class test_Simplify(u.TestCase, CommonTest):
 
         expr = (((b * (c & d)) - (d * (b & c))) * (a & c))
         sexpr = bac_cab_backward(expr)
+        assert self._check_args(
+            sexpr,
+            (a & c) * (c ^ (b ^ d))
+        )
+    
+    def test_bac_cab(self):
+        a, b, c, d, e, f, g, h = self.vector_symbols
+        x, y, z = self.symbols
+
+        # forward
+        expr = (a - b) ^ (3 * b ^ 4 * (c + d))
+        sexpr = bac_cab(expr)
+        assert self._check_args(
+            sexpr, 
+            VecMul(-1, (4 * c + 4 * d), evaluate=False) * ((a - b) & (3 * b)) + (3 * ((a - b) & (4 * c + 4 * d)) * b)
+        )
+
+        # nested cross-products
+        expr = (a ^ (b ^ (c ^ (d ^ e))))
+        sexpr = bac_cab(expr)
+        assert self._check_args(
+            sexpr, 
+            VecMul(-1, d * (c & e) - e * (c & d), (a & b), evaluate=False) + (a & (d * (c & e) - e * (c & d))) * b
+        )
+
+        # backward
+        expr = (b * (a & c)) - (c * (a & b))
+        sexpr = bac_cab(expr, False)
+        assert self._check_args(
+            sexpr,
+            a ^ (b ^ c)
+        )
+
+        expr = (b * (a & c)) - (c * (a & b)) + 2 * x * y * (d * (e & f)) - (2 * x * y * f * (d & e))
+        sexpr = bac_cab(expr, False)
+        assert self._check_args(
+            sexpr,
+            2 * x * y * (e ^ (d ^ f)) + (a ^ (b ^ c))
+        )
+
+        expr = (((b * (c & d)) - (d * (b & c))) * (a & c)) - (c * (a & ((b * (c & d)) - (d * (b & c)))))
+        sexpr = bac_cab(expr, False)
+        assert self._check_args(
+            sexpr,
+            a ^ ((c ^ (b ^ d)) ^ c)
+        )
+
+        expr = (((b * (c & d)) - (d * (b & c))) * (a & c))
+        sexpr = bac_cab(expr, False)
         assert self._check_args(
             sexpr,
             (a & c) * (c ^ (b ^ d))

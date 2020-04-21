@@ -9,30 +9,19 @@ from vector_expr import (
 )
 
 # TODO: 
-# 1. bac_cab_forward, dot_cross are identical in structure. Bring them 
-#    together
-# 2. Create test for the method with and without parameter 'match'
-# 3. Test dot-cross products expansions:
-#    (a ^ (b ^ (c + d))) = a ^ (b ^ c) + a ^ (b ^ d)
-# 4. expr = a.mag * (a ^ b) + a.mag * (a ^ c)
+# 1. Create test for the method with and without parameter 'match'
+# 2. expr = a.mag * (a ^ b) + a.mag * (a ^ c)
 #    simplify(expr)
 #    a.mag * (a ^ (b + c))
-# 5. dot_cross backward/forward
-# 6. bac_cab_forward, dot_cross: use 'matches' instead of 'match', thus a 
-#    for loop
 
-def bac_cab_forward(expr, match=None):
-    """ Implement the replacement rule:
-    A x (B x C) = B (A . C) - C (A . B)
-    where:
-        A, B, C are vectors;
-        x represents the cross product
-        . represents the dot product
+
+def _find_and_replace(expr, pattern, rep, matches=None):
+    """ Given an expression, a search `pattern` and a replacement 
+    pattern `rep`, search for `pattern` in the expression and substitute 
+    it with `rep`. If matches is given, skip the pattern search and 
+    substitute each match with the corresponding `rep` pattern.
     """
-    A, B, C = [WVS(t) for t in ["A", "B", "C"]]
-    pattern = A ^ (B ^ C)
-    rep = (B * (A & C)) - (C * (A & B))
-    if not match:
+    if not matches:
         # list of matches ordered accordingly to the length of the match.
         # The shorter the match expression, the lower it should be in the
         # expression tree. Substitute from the bottom up!
@@ -41,31 +30,69 @@ def bac_cab_forward(expr, match=None):
             f = found[0]
             expr = expr.xreplace({f: rep.xreplace(f.match(pattern))})
             # repeat the procedure with the updated expression
-            expr = bac_cab_forward(expr)   
+            expr = _find_and_replace(expr, pattern, rep)   
         return expr
-    return expr.xreplace({match: rep.xreplace(match.match(pattern))})
+    
+    if not isinstance(matches, (list, tuple)):
+        matches = [matches]
+    for match in matches:
+        expr = expr.xreplace({match: rep.xreplace(match.match(pattern))})
+    return expr
 
-def dot_cross(expr, match=None):
+def bac_cab(expr, forward=True, matches=None):
+    """ Implement the replacement rule:
+    A x (B x C) = B (A . C) - C (A . B)
+    where:
+        A, B, C are vectors;
+        x represents the cross product
+        . represents the dot product
+    
+    If forward=True, search for the pattern A ^ (B ^ C), otherwise
+    search for the pattern B (A . C) - C (A . B).
+
+    If `matches` is given, replace only the matching subexpressions.
+
+    This is a commodity function to use `bac_cab_forward` and 
+    `bac_cab_backward` with a single command.
+    """
+    if forward:
+        return bac_cab_forward(expr, matches)
+    else:
+        return bac_cab_backward(expr, matches)
+
+
+def bac_cab_forward(expr, matches=None):
+    """ Implement the replacement rule:
+    A x (B x C) = B (A . C) - C (A . B)
+    where:
+        A, B, C are vectors;
+        x represents the cross product
+        . represents the dot product
+    
+    If `matches` is given, replace only the matching subexpressions.
+    """
+    A, B, C = [WVS(t) for t in ["A", "B", "C"]]
+    pattern = A ^ (B ^ C)
+    rep = (B * (A & C)) - (C * (A & B))
+    return _find_and_replace(expr, pattern, rep, matches) 
+
+
+def dot_cross(expr, matches=None):
     """ Implement the replacement rule:
     A . (B x C) = (A x B) . C
     where:
         A, B, C are vectors;
         x represents the cross product
         . represents the dot product
+    
+    If `matches` is given, replace only the matching subexpressions.
     """
     A, B, C = [WVS(t) for t in ["A", "B", "C"]]
     pattern = A & (B ^ C)
     rep = (A ^ B) & C
-    if not match:
-        found = list(ordered(list(expr.find(pattern))))
-        if len(found) > 0:
-            f = found[0]
-            expr = expr.xreplace({f: rep.xreplace(f.match(pattern))})
-            expr = dot_cross(expr)   
-        return expr
-    return expr.xreplace({match: rep.xreplace(match.match(pattern))})
+    return _find_and_replace(expr, pattern, rep, matches) 
 
-def find_triple_cross_product(expr):
+def find_double_cross(expr):
     """ Given a vector expression, return a list of elements satisfying
     the pattern A x (B x C), where A, B, C are vectors and `x` is the
     cross product. The list is ordered in such a way that nested matches
@@ -133,6 +160,8 @@ def bac_cab_backward(expr, matches=None):
         A, B, C are vectors;
         x represents the cross product
         . represents the dot product
+    
+    If `matches` is given, replace only the matching subexpressions.
     """
     def _get_abc(match):
         terms = match.args

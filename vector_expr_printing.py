@@ -3,10 +3,17 @@ from sympy.core.function import _coeff_isneg
 from sympy.printing.latex import LatexPrinter, translate, _between_two_numbers_p
 from sympy.printing.precedence import precedence_traditional, PRECEDENCE
 from sympy.printing.conventions import split_super_sub, requires_partial
+from sympy.core.compatibility import Iterable
 from vector_expr import (
     VecAdd, VecCross, VecDot, VecMul, VecPow, VectorExpr,
     Magnitude, Normalize, VectorSymbol, VectorOne, VectorZero, D
 )
+
+# TODO:
+# 1. _print_Derivative prints partial symbol, for example:
+#       (a ^ b).diff(x, evaluate=False)
+#
+
 # adapted from sympy.printing.latex
 def vector_latex(expr, fold_frac_powers=False, fold_func_brackets=False,
           fold_short_frac=None, inv_trig_style="abbreviated",
@@ -151,6 +158,9 @@ class MyLatexPrinter(LatexPrinter):
         if exp == sp.S.NegativeOne:
             return r"\frac{1}{%s}" % self._print(base)
         else:
+            if not isinstance(base, VectorExpr):
+                return self._helper_print_standard_power(expr, "%s^{%s}")
+
             base_str = r"\left(%s\right)^{%s}"
             if isinstance(base, Magnitude):
                 base_str = "%s^{%s}"
@@ -164,7 +174,7 @@ class MyLatexPrinter(LatexPrinter):
         return self._print_Derivative(expr.args[0])
     
     def _print_Derivative(self, expr):
-        if requires_partial(expr.expr):
+        if upgraded_requires_partial(expr.expr):
             diff_symbol = r'\partial'
         else:
             diff_symbol = r'd'
@@ -322,3 +332,25 @@ def _wrap_cross_dot_arg(printer, expr):
     if wrap:
         s = r"\left(%s\right)" % s
     return s
+
+def upgraded_requires_partial(expr):
+    """Return whether a partial derivative symbol is required for printing
+    This requires checking how many free variables there are,
+    filtering out the ones that are integers. Some expressions don't have
+    free variables. In that case, check its variable list explicitly to
+    get the context of the expression.
+    """
+    
+    # TODO: because at the moment I only implemented univariate derivative,
+    # I can return False. Once partial derivatives are implemented, need to
+    # figure out a way to return the correct value.
+    if isinstance(expr, VectorExpr):
+        return False
+
+    if isinstance(expr, sp.Derivative):
+        return upgraded_requires_partial(expr.expr)
+
+    if not isinstance(expr.free_symbols, Iterable):
+        return len(set(expr.variables)) > 1
+
+    return sum(not s.is_integer for s in expr.free_symbols) > 1

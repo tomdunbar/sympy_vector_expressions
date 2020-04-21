@@ -1,5 +1,4 @@
 # import sympy as sp
-import sympy as sp
 from sympy import (
     sympify, S, Basic, Expr, Derivative, Abs, Mul, Add, Pow, 
     Symbol, Number, log, Wild
@@ -20,6 +19,15 @@ from sympy.vector import (
 )
 
 class VectorExpr(Expr):
+    """ Superclass for vector expressions.
+
+    Example:
+    a = VectorSymbol("a")
+    b = VectorSymbol("a")
+    c = VectorSymbol("a")
+    expr = (a ^ (b ^ c)) + (a & b) * c + a.mag * b
+    """
+
     is_Vector = False
     is_VectorExpr = True
     is_Cross = False
@@ -73,9 +81,13 @@ class VectorExpr(Expr):
     def __radd__(self, other):
         return VecAdd(other, self, check=True)
     
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__rdiv__')
     def __div__(self, other):
         return self * other**S.NegativeOne
 
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__div__')
     def __rdiv__(self, other):
         raise NotImplementedError()
 
@@ -85,38 +97,52 @@ class VectorExpr(Expr):
     def __neg__(self):
         return VecMul(S.NegativeOne, self, check=True)
     
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__rsub__')
     def __sub__(self, other):
         return VecAdd(self, -other, check=True)
 
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__sub__')
     def __rsub__(self, other):
         return VecAdd(other, -self, check=True)
     
+    @_sympifyit('other', NotImplemented)
     def __and__(self, other):
         return VecDot(self, other)
     
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__rmul__')
     def __mul__(self, other):
         return VecMul(self, other, check=True)
     
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__mul__')
     def __rmul__(self, other):
         return VecMul(self, other, check=True)
 
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__rpow__')
     def __pow__(self, other):
-        if other == S.One:
-            return self
         return VecPow(self, other).doit(deep=False)
 
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__pow__')
     def __rpow__(self, other):
-        raise NotImplementedError("Vector Power not defined")
-        
+        if other == S.One:
+            return other
+        return VecPow(other, self).doit(deep=False)
+    
+    @_sympifyit('other', NotImplemented)
     def __xor__(self, other):
         return VecCross(self, other)
 
     # need the following twos for auto-diff evaluation
-    def _eval_derivative_n_times(self, s, n):
-        return Basic._eval_derivative_n_times(self, s, n)
+    # def _eval_derivative_n_times(self, s, n):
+    #     return Basic._eval_derivative_n_times(self, s, n)
     
-    def _accept_eval_derivative(self, s):
-        return s._visit_eval_derivative_scalar(self)
+    # def _accept_eval_derivative(self, s):
+    #     return s._visit_eval_derivative_scalar(self)
     
     def dot(self, other):
         return VecDot(self, other)
@@ -198,32 +224,21 @@ class VectorExpr(Expr):
         if isinstance(self, VectorSymbol):
             return self
 
-        _spaces.append(_token)
-        
-        debug("")
-        debug("VectorExpr expand", self)
-
         # first expand dot and cross products
         A, B = [WVS(t) for t in ["A", "B"]]
         def func(expr, pattern, prev=None):
-            _spaces.append(_token)
             old = expr
             found = list(ordered(list(expr.find(pattern))))
-            debug("FOUND", found)
             for f in found:
                 fexp = f.expand()
-                debug(f, fexp)
                 if f != fexp:
                     expr = expr.xreplace({f: f.expand()})
             
             if old != expr:
                 expr = func(expr, pattern)
-            del _spaces[-1]
             return expr
         expr = func(self, A ^ B)
         expr = func(expr, A & B)
-        debug("VectorExpr after dot/cross exp", expr)
-        del _spaces[-1]
         return Expr.expand(expr, deep=deep, modulus=modulus, power_base=power_base,
             power_exp=power_exp, mul=mul, log=log, multinomial=multinomial, 
             basic=basic, **hints)
@@ -265,7 +280,7 @@ def get_postprocessor(cls):
         # evaluation. This is necessary because collect_consts is going to call
         # unevaluate Mul or Add, but these are going to be converted to VecMul
         # or VecAdd by the postprocessor. If we do not set evaluate=False, then
-        # work done by collect_const would have expanded back to its original 
+        # work done by collect_const would be expanded back to its original 
         # form. 
         if vec_class == VecAdd:
         #     return vec_class(*vectors).doit(deep=False)
@@ -274,7 +289,6 @@ def get_postprocessor(cls):
         return vec_class(cls._from_args(nonvectors), *vectors, evaluate=False)
     return _postprocessor
 
-
 Basic._constructor_postprocessor_mapping[VectorExpr] = {
     "Mul": [get_postprocessor(Mul)],
     "Add": [get_postprocessor(Add)],
@@ -282,6 +296,9 @@ Basic._constructor_postprocessor_mapping[VectorExpr] = {
 
 
 class VectorSymbol(VectorExpr):
+    """ Symbolic representation of a Vector object.
+    """
+
     is_symbol = True
     is_Vector = True
 
@@ -304,6 +321,14 @@ class VectorSymbol(VectorExpr):
         _unit_vec_symbol = kwargs.get('_unit_vec_symbol', "")
         _bold = kwargs.get('_bold', False)
         _italic = kwargs.get('_italic', False)
+
+        # TODO:
+        # Say we created the following two symbols:
+        # v1a = VectorSymbol("v1", _vec_symbol="\hat{%s}")
+        # v1b = VectorSymbol("v1")
+        #       v1a == v1b  -> True
+        # Do I want to include the attributes in the hash to make them
+        # different?
         
         obj._vec_symbol = _vec_symbol
         obj._unit_vec_symbol = _unit_vec_symbol
@@ -370,6 +395,9 @@ class WildVectorSymbol(Wild, VectorSymbol):
 WVS = WildVectorSymbol
 
 class Normalize(VectorExpr):
+    """ Symbolic representation of a normalized symbolic vector. Given a vector
+    v, the normalized form is: v / v.magnitude
+    """
     is_Normalized = True
     is_Vector = True
 
@@ -398,6 +426,8 @@ class Normalize(VectorExpr):
         return VecMul(args[0], VecPow(Magnitude(args[0]), -1))
     
 class Magnitude(VectorExpr):
+    """ Symbolic representation of the magnitude of a symbolic vector.
+    """
     is_Vector = False
     is_Norm = True
     is_positive = True
@@ -500,19 +530,13 @@ class DotCross(VectorExpr):
         return t1 + t2
     
     def expand(self, **hints):
-        _spaces.append(_token)
-        debug("")
-        debug("{} expand".format(self.func), self)
         left = self.args[0].expand()
         right = self.args[1].expand()
         if not (isinstance(left, VecAdd) or isinstance(right, VecAdd)):
-            del _spaces[-1]
             return self.func(left, right)
         get_args = lambda expr: expr.args if isinstance(expr, VecAdd) else [expr]
         left = get_args(left)
         right = get_args(right)
-        debug("left", left)
-        debug("right", right)
 
         def _get_vector(expr):
             if isinstance(expr, (VectorSymbol, VecCross, VecDot)):
@@ -530,18 +554,16 @@ class DotCross(VectorExpr):
         for l in left:
             cl = _get_coeff(l)
             vl = _get_vector(l)
-            debug("left", l, cl, vl)
             for r in right:
                 cr = _get_coeff(r)
                 vr = _get_vector(r)
-                debug("right", r, cr, vr)
                 c = cl * cr
                 terms.append(c * self.func(vl, vr))
-        debug("Exit DotCross expand", VecAdd(*terms))
-        del _spaces[-1]
         return VecAdd(*terms)
 
 class VecDot(DotCross):
+    """ Symbolic representation of the dot product between two symbolic vectors.
+    """
     is_Dot = True
     is_Vector_Scalar = True
     
@@ -589,6 +611,9 @@ class VecDot(DotCross):
         return self.func(*args)
 
 class VecCross(DotCross):
+    """ Symbolic representation of the cross product between two symbolic 
+    vectors.
+    """
     is_Cross = True
     is_Vector = True
     is_commutative = False
@@ -641,7 +666,9 @@ class VecCross(DotCross):
             args = [arg.doit(**kwargs) for arg in self.args]
         return self.func(*args)
 
-# used for debugging the expressions trees
+# used for debugging the expressions trees: append a _token to _spaces each time
+# an object is created. Remember to remove the token once the object has been
+# created
 _spaces = []
 _token = "    "
 _DEBUG = False
@@ -665,25 +692,22 @@ def _check_if_scalar(expr):
 
 # class VecAdd(VectorExpr):
 class VecAdd(VectorExpr, Add):
+    """ A sum of Vector expressions.
+
+    VecAdd inherits from and operates like SymPy Add.
+    """
     is_VecAdd = True
     is_commutative = True
     
     def __new__(cls, *args, **kwargs):
-        # _spaces.append(_token)
-
         check = kwargs.get('check', True)
         evaluate = kwargs.get('evaluate', True)
         
         if not args:
-            # del _spaces[-1]
             return VectorZero()
-        
-        # debug("VecAdd __new__", args)
 
         args = list(map(sympify, args))
         if len(args) == 1:
-            # debug("VecAdd one arg", args[0].func, args[0])
-            # del _spaces[-1]
             # doesn't make any sense to have 1 argument in VecAdd if 
             # evaluate=True
             return args[0]
@@ -694,12 +718,8 @@ class VecAdd(VectorExpr, Add):
                 if not (isinstance(a, VectorZero) or (a == S.Zero))]
             
             if len(args) == 0:
-                # debug("VecAdd evaluate - no args")
-                # del _spaces[-1]
                 return VectorZero()
             elif len(args) == 1:
-                # debug("VecAdd evaluate - one arg", args[0].func, args[0])
-                # del _spaces[-1]
                 # doesn't make any sense to have 1 argument in VecAdd if 
                 # evaluate=True
                 return args[0]
@@ -718,8 +738,6 @@ class VecAdd(VectorExpr, Add):
             is_commutative = not nc_part
 
             if len(args) == 1:
-                # debug("VecAdd evaluate end - one arg", args[0].func, args[0])
-                # del _spaces[-1]
                 return args[0]
         else:
             # TODO: addition is not commutative if an argument is not commutative!!!
@@ -733,7 +751,6 @@ class VecAdd(VectorExpr, Add):
         # if there is only one argument and it was 1, then obj is the number
         # one, whose property is_Vector is hidden, therefore return 1 immediatly
         if isinstance(obj, Number):
-            # del _spaces[-1]
             return VectorZero()
         
         # are there any scalars or vectors?
@@ -742,12 +759,6 @@ class VecAdd(VectorExpr, Add):
         are_scalars = any([_check_if_scalar(a) for a in args 
             if not isinstance(a, Vector)])
         
-        # debug("VecAdd post eval", args)
-        # debug("\t", ", ".join([str(a.func) for a in args]))
-        # debug("VecAdd are_vectors", [a.is_Vector for a in args])
-        # debug("VecAdd are_scalars", [_check_if_scalar(a) for a in args 
-            # if not isinstance(a, Vector)])
-        
         # addition of mixed scalars and vectors is not supported.
         # If there are scalars in the addition, either all arguments
         # are scalars (hence not a vector expression) or there are
@@ -755,18 +766,13 @@ class VecAdd(VectorExpr, Add):
         obj.is_Vector = not are_scalars
         obj.is_Vector_Scalar = not obj.is_Vector
 
-        # debug("VecAdd is_Vector", obj.is_Vector)
-        # debug("VecAdd is_Vector_Scalar", obj.is_Vector_Scalar)
-
         if check:
             if all(not isinstance(i, (VectorExpr, Vector)) for i in args):
-                # del _spaces[-1]
                 return Add.fromiter(args)
             if (are_vectors and are_scalars):
                 raise TypeError("Mix of Vector and Scalar symbols:\n\t" + 
                     "\n\t".join(str(a.func) + ", " + str(a) for a in args)
                 )
-        # del _spaces[-1]
         return obj
     
     def _eval_derivative(self, s):
@@ -826,30 +832,27 @@ canonicalize = exhaust(condition(lambda x: isinstance(x, VecAdd),
 
 # class VecMul(VectorExpr):
 class VecMul(VectorExpr, Mul):
+    """ A product of Vector expressions.
+
+    VecMul inherits from and operates like SymPy Mul.
+    """
     is_VecMul = True
     is_commutative = True
     
     def __new__(cls, *args, **kwargs):
-        # _spaces.append(_token)
         check = kwargs.get('check', True)
         evaluate = kwargs.get('evaluate', True)
 
         if not args:
-            # del _spaces[-1]
             # it makes sense to return VectorOne, after all we are talking
             # about VecMul. However, this would play against us when using
             # expand(), because we would have multiplications of multiple 
             # vectors (one of which, VectorOne). 
-            # Hence, better to return sp.S.One.
-            return sp.S.One
-            return VectorOne()
-        
-        # debug("VecMul __new__", args)
+            # Hence, better to return S.One.
+            return S.One
 
         args = list(map(sympify, args))
         if len(args) == 1:
-            # debug("VecMul only one arg", args[0].func, args[0])
-            # del _spaces[-1]
             # doesn't make any sense to have 1 argument in VecAdd if 
             # evaluate=True
             return args[0]
@@ -864,23 +867,17 @@ class VecMul(VectorExpr, Mul):
             # remove instances of S.One
             args = [a for a in args if a is not cls.identity]
             if len(args) == 0:
-                # del _spaces[-1]
                 return S.One
             if len(args) == 1:
-                # debug("VecMul evaluate - only one arg", args[0].func, args[0])
-                # del _spaces[-1]
                 return args[0]
 
             # check if any vector is present
             args_is_vector = [a.is_Vector for a in args]
             if any([a == S.Zero for a in args]):
                 if any(args_is_vector):
-                    # del _spaces[-1]
                     return VectorZero()
-                # del _spaces[-1]
                 return S.Zero
             if any([isinstance(a, VectorZero) for a in args]):
-                # del _spaces[-1]
                 return VectorZero()
 
             # Create a new object of type VecAdd. By calling  Basic.__new__ we  
@@ -899,14 +896,12 @@ class VecMul(VectorExpr, Mul):
                 # think about (a & b) / (a & b) -> after flatten()
                 # there is no arguments. Must be 1.
                 # TODO: test this!!!
-                return sp.S.One
+                return S.One
 
             # Mul.flatten may group arguments together. Think for example to:
             # VecMul(v1.mag, v1.mag) -> VecPow(v1.mag, 2)
             # Need to perform this check again.
             if len(args) == 1:
-                # debug("VecMul end evaluate - only one arg", args[0].func, args[0])
-                # del _spaces[-1]
                 # the object coming out from flatten, even if it is VecAdd,
                 # it always have the property is_Vector=False... Need to enforce
                 # the proper value by recreating the object.
@@ -922,20 +917,12 @@ class VecMul(VectorExpr, Mul):
         scalars = [_check_if_scalar(a) for a in args]
         cscalars = scalars.count(True)
 
-        # debug("VecMul post eval", args)
-        # debug("\t", ", ".join([str(a.func) for a in args]))
-        # debug("VecMul vectors", vectors)
-        # debug("VecMul scalars", scalars)
-
         # multiplication of vectors is not supported. If there are multiple
         # vectors, an error will be thrown.
         # If all arguments are scalars, the resulting expression wil not
         # be a vector
         obj.is_Vector = cscalars != len(args)
         obj.is_Vector_Scalar = not obj.is_Vector
-
-        # debug("VecMul is_Vector", obj.is_Vector)
-        # debug("VecMul is_Vector_Scalar", obj.is_Vector_Scalar)
         
         if check:
             if cvectors > 1:
@@ -943,9 +930,7 @@ class VecMul(VectorExpr, Mul):
                     "\n\t".join(str(a.func) + ", " + str(a) for a in args)
                 )
             if all(not isinstance(a, VectorExpr) for a in args):
-                # del _spaces[-1]
                 return Mul.fromiter(args)
-        # del _spaces[-1]
         return obj
 
     def _eval_derivative(self, s):
@@ -978,16 +963,24 @@ class VecMul(VectorExpr, Mul):
         raise TypeError("Derivative order must be integer")
 
 class VecPow(VectorExpr, Pow):
+    """ A power of Vector expressions.
+
+    VecPow inherits from and operates like SymPy Pow.
+    """
     def __new__(cls, base, exp):
         base = S(base)
         exp =  S(exp)
         if base.is_Vector:
             raise TypeError("Vector power not available")
-        if not isinstance(base, VectorExpr):
-            if isinstance(exp, VectorExpr) and exp.is_Vector:
-                raise TypeError("Vector exponent not available")
+        if exp.is_Vector:
+            raise TypeError("Vector power not available")
+
+        if ((not isinstance(base, VectorExpr)) and 
+            (not isinstance(exp, VectorExpr))):
             return Pow(base, exp)
         
+        if base == S.One:
+            return base
         if exp == S.One:
             return base
 
@@ -1023,53 +1016,24 @@ def _sanitize_args(args):
     it is not updated with the value of VecMul.
     Solution: instead of rewriting flatten(), post process the result.
     """
-    # _map = {
-    #     Add: VecAdd,
-    #     Mul: VecMul,
-    #     Pow: VecPow
-    # }
-    # def func(a, k):
-    #     if any([isinstance(arg, VectorExpr) for arg in a.args]):
-    #         v = _map[k]
-    #         a = a.replace(k, v)
-    #         a.is_Vector = any([(isinstance(arg, VectorExpr) and
-    #             arg.is_Vector) for arg in a.args])
-    #         a.is_Vector_Scalar = not a.is_Vector
-    #     return a
-
-    # args = list(args)
-    # for i, a in enumerate(args):
-    #     if isinstance(a, Add):
-    #         args[i] = func(a, Add)
-    #     if isinstance(a, Mul):
-    #         args[i] = func(a, Mul)
-    #     if isinstance(a, Pow):
-    #         args[i] = func(a, Pow)
-    # return args
 
     args = list(args)
     for i, a in enumerate(args):
         if isinstance(a, Add):
             if any([isinstance(arg, VectorExpr) for arg in a.args]):
                 args[i] = a.replace(Add, VecAdd)
-                # args[i].is_Vector = any([isinstance(arg, VectorSymbol)
-                #     for arg in a.args])
                 args[i].is_Vector = any([(isinstance(arg, VectorExpr) and
                     arg.is_Vector) for arg in a.args])
                 args[i].is_Vector_Scalar = not args[i].is_Vector
         if isinstance(a, Mul):
             if any([isinstance(arg, VectorExpr) for arg in a.args]):
                 args[i] = a.replace(Mul, VecMul)
-                # args[i].is_Vector = any([isinstance(arg, VectorSymbol)
-                #     for arg in a.args])
                 args[i].is_Vector = any([(isinstance(arg, VectorExpr) and
                     arg.is_Vector) for arg in a.args])
                 args[i].is_Vector_Scalar = not args[i].is_Vector
         if isinstance(a, Pow):
             if any([isinstance(arg, VectorExpr) for arg in a.args]):
                 args[i] = a.replace(Pow, VecPow)
-                # args[i].is_Vector = any([isinstance(arg, VectorSymbol)
-                #     for arg in a.args])
                 args[i].is_Vector = any([(isinstance(arg, VectorExpr) and
                     arg.is_Vector) for arg in a.args])
                 args[i].is_Vector_Scalar = not args[i].is_Vector
