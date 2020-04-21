@@ -18,28 +18,32 @@ class test_VecDot(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        assert isinstance(D(2), Number)
-        assert isinstance(D(self.v1), VectorSymbol)
-        assert isinstance(D(self.v1 + self.v2), VecAdd)
-        assert isinstance(D(self.v1.mag * self.v2), VecMul)
-        assert isinstance(D(self.v1 & self.v2), VecDot)
-        assert isinstance(D(self.v1 ^ self.v2), VecCross)
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
         
-        assert isinstance(D(self.v1.diff(x)), D)
-        assert isinstance((self.v1 + self.v2).diff(x, evaluate=False), D)
-        assert isinstance((self.v1.mag * self.v2).diff(x, evaluate=False), D)
-        assert isinstance((self.v1 & self.v2).diff(x, evaluate=False), D)
-        assert isinstance((self.v1 ^ self.v2).diff(x, evaluate=False), D)
+        assert isinstance(D(2), Number)
+        assert isinstance(D(v1), VectorSymbol)
+        assert isinstance(D(v1 + v2), VecAdd)
+        assert isinstance(D(v1.mag * v2), VecMul)
+        assert isinstance(D(v1 & v2), VecDot)
+        assert isinstance(D(v1 ^ v2), VecCross)
+        
+        assert isinstance(D(v1.diff(x)), D)
+        assert isinstance((v1 + v2).diff(x, evaluate=False), D)
+        assert isinstance((v1.mag * v2).diff(x, evaluate=False), D)
+        assert isinstance((v1 & v2).diff(x, evaluate=False), D)
+        assert isinstance((v1 ^ v2).diff(x, evaluate=False), D)
     
     def test_is_vector(self):
-        assert (self.v1 + self.v2).diff(x, evaluate=False).is_Vector
-        assert not (self.v1 + self.v2).diff(x, evaluate=False).is_Vector_Scalar
-        assert (self.v1.mag * self.v2).diff(x, evaluate=False).is_Vector
-        assert not (self.v1.mag * self.v2).diff(x, evaluate=False).is_Vector_Scalar
-        assert not (self.v1 & self.v2).diff(x, evaluate=False).is_Vector
-        assert (self.v1 & self.v2).diff(x, evaluate=False).is_Vector_Scalar
-        assert (self.v1 ^ self.v2).diff(x, evaluate=False).is_Vector
-        assert not (self.v1 ^ self.v2).diff(x, evaluate=False).is_Vector_Scalar
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        assert (v1 + v2).diff(x, evaluate=False).is_Vector
+        assert not (v1 + v2).diff(x, evaluate=False).is_Vector_Scalar
+        assert (v1.mag * v2).diff(x, evaluate=False).is_Vector
+        assert not (v1.mag * v2).diff(x, evaluate=False).is_Vector_Scalar
+        assert not (v1 & v2).diff(x, evaluate=False).is_Vector
+        assert (v1 & v2).diff(x, evaluate=False).is_Vector_Scalar
+        assert (v1 ^ v2).diff(x, evaluate=False).is_Vector
+        assert not (v1 ^ v2).diff(x, evaluate=False).is_Vector_Scalar
     
 
 if __name__ == "__main__":

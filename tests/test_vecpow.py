@@ -18,57 +18,63 @@ class test_VecPow(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        assert VecPow(1, self.v1.mag) == S.One
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+
+        assert VecPow(1, v1.mag) == S.One
         assert isinstance(VecPow(x, 1), Symbol)
         assert isinstance(VecPow(x, 2), Pow)
         assert isinstance(VecPow(3, 2), Integer)
         assert isinstance(VecPow(3, 2), Integer)
         
         # base is instance of VectorExpr with is_Vector=False
-        assert isinstance(VecPow(self.v1.mag, 1), Magnitude)
-        assert isinstance(VecPow(self.v1.mag, -1), VecPow)
-        assert isinstance(VecPow(self.v1.mag, 2), VecPow)
-        assert isinstance(VecPow(self.v1 & self.v2, 2), VecPow)
+        assert isinstance(VecPow(v1.mag, 1), Magnitude)
+        assert isinstance(VecPow(v1.mag, -1), VecPow)
+        assert isinstance(VecPow(v1.mag, 2), VecPow)
+        assert isinstance(VecPow(v1 & v2, 2), VecPow)
 
         def func(*args):
             with self.assertRaises(TypeError) as context:
                 VecPow(*args)
 
         # base is instance of VectorExpr with is_Vector=True
-        func(self.v1, 1)
-        func(self.v1, 2)
-        func(self.v1.norm, 2)
-        func(self.v1 + self.v2, 2)
-        func(self.v1 + self.v2, 2)
-        func(self.v1 + self.v2, 2)
-        func(self.v1 ^ self.v2, 2)
-        func(self.v1.mag * self.v2, 2)
+        func(v1, 1)
+        func(v1, 2)
+        func(v1.norm, 2)
+        func(v1 + v2, 2)
+        func(v1 + v2, 2)
+        func(v1 + v2, 2)
+        func(v1 ^ v2, 2)
+        func(v1.mag * v2, 2)
 
         # exponent is instance of VectorExpr with is_Vector=True
-        func(2, self.v1)
-        func(2, self.v1 ^ self.v2)
-        func(2, self.v1.norm)
+        func(2, v1)
+        func(2, v1 ^ v2)
+        func(2, v1.norm)
 
         # base is not instance of VectorExpr
-        assert isinstance(VecPow(2, self.v1.mag), VecPow)
-        assert isinstance(VecPow(x, self.v1.mag), VecPow)
+        assert isinstance(VecPow(2, v1.mag), VecPow)
+        assert isinstance(VecPow(x, v1.mag), VecPow)
 
         # base and exp are instances of VectorExpr with is_Vector=False
-        assert isinstance(VecPow(self.v1.mag, self.v1.mag), VecPow)
-        assert isinstance(VecPow(self.v1.mag, (self.v1 & self.v2)), VecPow)
+        assert isinstance(VecPow(v1.mag, v1.mag), VecPow)
+        assert isinstance(VecPow(v1.mag, (v1 & v2)), VecPow)
 
     
     def test_doit(self):
-        expr = VecPow(VecDot(self.vn1, self.vn2), self.v1.mag)
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        expr = VecPow(VecDot(vn1, vn2), v1.mag)
         assert isinstance(expr, VecPow)
         assert isinstance(expr.doit(deep=False), VecPow)
         assert isinstance(expr.doit(), Pow)
     
     def test_is_vector(self):
-        assert not VecPow(self.v1.mag, 1).is_Vector
-        assert not VecPow(self.v1.mag, -1).is_Vector
-        assert not VecPow(self.v1.mag, 2).is_Vector
-        assert not VecPow(self.v1 & self.v2, 2).is_Vector
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        assert not VecPow(v1.mag, 1).is_Vector
+        assert not VecPow(v1.mag, -1).is_Vector
+        assert not VecPow(v1.mag, 2).is_Vector
+        assert not VecPow(v1 & v2, 2).is_Vector
 
 if __name__ == "__main__":
     u.main()

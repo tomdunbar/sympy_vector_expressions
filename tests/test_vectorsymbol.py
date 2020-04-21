@@ -18,54 +18,66 @@ class test_VectorSymbol(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
         assert VectorSymbol("v1")
         assert VectorSymbol(Symbol("x"))
-        assert VectorSymbol(self.v1)
+        assert VectorSymbol(v1)
 
         def func(s):
             with self.assertRaises(TypeError) as context:
                 VectorSymbol(s)
             self.assertTrue("'name' must be a string or a Symbol or a VectorSymbol" in str(context.exception))
         
-        func(VecAdd(self.v1, self.v2))
+        func(VecAdd(v1, v2))
         func(Symbol("x") + Symbol("y"))
     
     def test_attributes(self):
-        assert hasattr(self.v1, "_vec_symbol")
-        assert hasattr(self.v1, "_unit_vec_symbol")
-        assert hasattr(self.v1, "_bold")
-        assert hasattr(self.v1, "_italic")
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        assert hasattr(v1, "_vec_symbol")
+        assert hasattr(v1, "_unit_vec_symbol")
+        assert hasattr(v1, "_bold")
+        assert hasattr(v1, "_italic")
     
     def test_is_vector(self):
-        assert self.v1.is_Vector
-        assert self.v2.is_Vector
-        assert self.one.is_Vector
-        assert self.zero.is_Vector
-        assert self.nabla.is_Vector
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        assert v1.is_Vector
+        assert v2.is_Vector
+        assert one.is_Vector
+        assert zero.is_Vector
+        assert nabla.is_Vector
     
     def test_zero_one_nabla(self):
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
         # magnitudes
-        assert self.zero.mag == S.Zero
-        assert isinstance(self.one.mag, Magnitude)
+        assert zero.mag == S.Zero
+        assert isinstance(one.mag, Magnitude)
         # unit vector
-        assert isinstance(self.zero.norm, VectorZero)
-        assert isinstance(self.one.norm, Normalize)
+        assert isinstance(zero.norm, VectorZero)
+        assert isinstance(one.norm, Normalize)
 
         with self.assertRaises(TypeError):
-            self.nabla.mag
+            nabla.mag
         with self.assertRaises(TypeError):
-            self.nabla.norm
+            nabla.norm
     
     def test_instances(self):
-        assert isinstance(self.zero, VectorSymbol)
-        assert isinstance(self.one, VectorSymbol)
-        assert isinstance(self.nabla, VectorSymbol)
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        assert isinstance(zero, VectorSymbol)
+        assert isinstance(one, VectorSymbol)
+        assert isinstance(nabla, VectorSymbol)
     
     def test_doit(self):
-        assert self.v1.doit() == self.v1
-        assert self.one.doit() == self.one
-        assert self.zero.doit() == self.zero
-        assert self.nabla.doit() == self.nabla
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        assert v1.doit() == v1
+        assert one.doit() == one
+        assert zero.doit() == zero
+        assert nabla.doit() == nabla
 
 if __name__ == "__main__":
     u.main()

@@ -18,54 +18,61 @@ class test_VecCross(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        assert VecCross(self.v1, self.zero) == self.zero
-        assert VecCross(self.zero, self.v1) == self.zero
-        assert VecCross(self.v1, self.v1) == self.zero
-        assert VecCross(self.vn1, self.vn1) == Vector.zero
-        assert VecCross(self.v1, self.v1.norm)
-        assert VecCross(self.vn1, self.v1.norm)
-        assert VecCross(self.nabla, self.v1)
-        assert VecCross(self.v1, self.nabla)
-        assert VecCross(self.v1, self.vn1)
-        assert VecCross(self.vn1, self.v1)
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+
+        assert VecCross(v1, zero) == zero
+        assert VecCross(zero, v1) == zero
+        assert VecCross(v1, v1) == zero
+        assert VecCross(vn1, vn1) == Vector.zero
+        assert VecCross(v1, v1.norm)
+        assert VecCross(vn1, v1.norm)
+        assert VecCross(nabla, v1)
+        assert VecCross(v1, nabla)
+        assert VecCross(v1, vn1)
+        assert VecCross(vn1, v1)
 
         def func(*args):
             with self.assertRaises(TypeError) as context:
                 VecCross(*args)
         
-        func(x, self.v1)
-        func(self.v1, x)
-        func(self.v1, self.v1.mag)
-        func(self.v1 & self.v2, self.v1.mag)
-        func(self.v1 & self.v2, self.v1)
-        func(0, self.v1)
+        func(x, v1)
+        func(v1, x)
+        func(v1, v1.mag)
+        func(v1 & v2, v1.mag)
+        func(v1 & v2, v1)
+        func(0, v1)
     
     def test_is_vector(self):
-        assert VecCross(self.v1, self.zero).is_Vector
-        assert VecCross(self.v1, self.v2).is_Vector
-        assert VecCross(self.vn1, self.vn2).is_Vector
-        assert VecCross(self.v1, self.vn1).is_Vector
-        assert VecCross((self.v1 & self.v2) * self.one, self.v2).is_Vector
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+
+        assert VecCross(v1, zero).is_Vector
+        assert VecCross(v1, v2).is_Vector
+        assert VecCross(vn1, vn2).is_Vector
+        assert VecCross(v1, vn1).is_Vector
+        assert VecCross((v1 & v2) * one, v2).is_Vector
     
     def test_reverse(self):
-        assert VecCross(self.v1, self.v2).reverse == -VecCross(self.v2, self.v1)
-        assert VecCross(self.vn1, self.v2).reverse == -VecCross(self.v2, self.vn1)
-        assert VecCross(self.v1, self.vn2).reverse == -VecCross(self.vn2, self.v1)
-        assert VecCross(self.vn1, self.vn2).reverse == -VecCross(self.vn2, self.vn1)
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+
+        assert VecCross(v1, v2).reverse == -VecCross(v2, v1)
+        assert VecCross(vn1, v2).reverse == -VecCross(v2, vn1)
+        assert VecCross(v1, vn2).reverse == -VecCross(vn2, v1)
+        assert VecCross(vn1, vn2).reverse == -VecCross(vn2, vn1)
     
     def test_doit(self):
-        assert VecCross(self.vn1, self.vn2).doit() - self.vn1.cross(self.vn2) == Vector.zero
-        assert VecCross(self.vn2, self.nabla).doit() - curl(self.vn2) == Vector.zero
-        assert VecCross(self.nabla, self.vn2).doit() - curl(self.vn2) == Vector.zero
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
 
-        C = self.C
+        assert VecCross(vn1, vn2).doit() - vn1.cross(vn2) == Vector.zero
+        assert VecCross(vn2, nabla).doit() - curl(vn2) == Vector.zero
+        assert VecCross(nabla, vn2).doit() - curl(vn2) == Vector.zero
+
         vn3 = C.x * C.y * C.z * C.i + C.x * C.y * C.z * C.j + C.x * C.y * C.z * C.k
-        assert VecCross(self.nabla, vn3).doit() - curl(vn3) == Vector.zero
-        assert VecCross(vn3, self.nabla).doit() + curl(vn3) == Vector.zero
+        assert VecCross(nabla, vn3).doit() - curl(vn3) == Vector.zero
+        assert VecCross(vn3, nabla).doit() + curl(vn3) == Vector.zero
         
-        expr = VecCross(self.v2 * VecDot(self.vn1, self.vn2), self.v1).doit()
+        expr = VecCross(v2 * VecDot(vn1, vn2), v1).doit()
         assert isinstance(expr.args[0].args[0], Add)
-        expr = VecCross(self.v2 * VecDot(self.vn1, self.vn2), self.v1).doit(deep=False)
+        expr = VecCross(v2 * VecDot(vn1, vn2), v1).doit(deep=False)
         assert isinstance(expr.args[0], VecMul)
 
 if __name__ == "__main__":

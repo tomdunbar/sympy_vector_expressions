@@ -17,43 +17,47 @@ class test_Normalize(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        assert isinstance(Normalize(self.v1), Normalize)
-        assert isinstance(Normalize(self.one), Normalize)
-        assert Normalize(self.zero) == self.zero
-        assert isinstance(Normalize(x * self.v1), Normalize)
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
+        assert isinstance(Normalize(v1), Normalize)
+        assert isinstance(Normalize(one), Normalize)
+        assert Normalize(zero) == zero
+        assert isinstance(Normalize(x * v1), Normalize)
 
         def func(arg):
             with self.assertRaises(TypeError) as context:
                 Normalize(arg)
 
-        assert isinstance(Normalize(self.v1 + self.v2), Normalize)
-        assert isinstance(Normalize(self.vn1), Normalize)
+        assert isinstance(Normalize(v1 + v2), Normalize)
+        assert isinstance(Normalize(vn1), Normalize)
 
-        args = [self.nabla, 1, self.v1.mag, VecDot(self.v1, self.v2)]
+        args = [nabla, 1, v1.mag, VecDot(v1, v2)]
         for a in args:
             func(a)
 
-        assert isinstance(Normalize(self.v1.norm), Normalize)
+        assert isinstance(Normalize(v1.norm), Normalize)
     
     def test_doit(self):
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        
         # return a VecMul object (a fraction, vector/magnitude)
-        assert isinstance(Normalize(self.v1).doit(), VecMul)
-        assert isinstance(Normalize(self.one).doit(), VecMul)
-        assert isinstance(Normalize(self.zero).doit(), VectorZero)
+        assert isinstance(Normalize(v1).doit(), VecMul)
+        assert isinstance(Normalize(one).doit(), VecMul)
+        assert isinstance(Normalize(zero).doit(), VectorZero)
         # symbolic Vector
-        assert Normalize(self.vn1).doit() - self.vn1.normalize() == Vector.zero
-        assert Normalize(self.vn2).doit() - self.vn2.normalize() == Vector.zero
-        assert Normalize(VecAdd(self.vn1, self.vn2)).doit() - (self.vn1 + self.vn2).normalize() == Vector.zero
-        assert isinstance(Normalize(VecAdd(self.vn1, self.vn2)).doit(deep=False), VecMul)
+        assert Normalize(vn1).doit() - vn1.normalize() == Vector.zero
+        assert Normalize(vn2).doit() - vn2.normalize() == Vector.zero
+        assert Normalize(VecAdd(vn1, vn2)).doit() - (vn1 + vn2).normalize() == Vector.zero
+        assert isinstance(Normalize(VecAdd(vn1, vn2)).doit(deep=False), VecMul)
     
         # test to check if the result is a vector
-        assert Normalize(self.v1).doit().is_Vector
-        assert Normalize(self.v1 + self.v2).doit().is_Vector
-        assert Normalize(self.one).doit().is_Vector
-        assert Normalize(self.zero).doit().is_Vector
-        assert Normalize(self.vn1).doit().is_Vector
-        assert Normalize(VecAdd(self.vn1, self.vn2)).doit().is_Vector
-        assert Normalize(VecAdd(self.vn1, self.vn2)).doit(deep=False).is_Vector
+        assert Normalize(v1).doit().is_Vector
+        assert Normalize(v1 + v2).doit().is_Vector
+        assert Normalize(one).doit().is_Vector
+        assert Normalize(zero).doit().is_Vector
+        assert Normalize(vn1).doit().is_Vector
+        assert Normalize(VecAdd(vn1, vn2)).doit().is_Vector
+        assert Normalize(VecAdd(vn1, vn2)).doit(deep=False).is_Vector
 
 if __name__ == "__main__":
     u.main()

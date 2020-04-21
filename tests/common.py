@@ -24,6 +24,10 @@ class CommonTest:
         self.vn1 = C.i + 2 * C.j + 3 * C.k
         self.vn2 = x * C.i + y * C.j + z * C.k
     
+    def _get_vars(self):
+        return [self.v1, self.v2, self.zero, self.one,
+            self.nabla, self.C, self.vn1, self.vn2]
+    
     def _check_args(self, expr1, expr2):
         """Return True if the arguments of expr1 are the same
         as the ones in expr2 (even if stored in different order)
@@ -33,37 +37,6 @@ class CommonTest:
         if len(args1 - args2) == 0:
             return True
         return False
-    
-    def _assert_vecadd(self, expr):
-        """ 
-        """
-        assert expr.is_Vector
-        assert not expr.is_Vector_Scalar
-        for a in expr.args:
-            assert a.is_Vector
-            assert not a.is_Vector_Scalar
-    
-    def _assert_expr_tree(self, expr, is_Vector=True):
-        """ Parse the expression tree, select the arguments of type VecAdd, 
-        VecMul, VecPow, VecCross, D and look for consistency in the is_Vector 
-        and is_Vector_Scalar properties.
-
-        Parameters
-        ----------
-            expr : the expression to parse
-            is_Vector : the expected value of the expr.is_Vector
-        """
-        assert expr.is_Vector == is_Vector
-        assert expr.is_Vector_Scalar == (not is_Vector)
-
-        if isinstance(expr, VecAdd):
-            
-            for arg in expr.args:
-                pass
-
-
-        for arg in preorder_traversal(expr):
-            pass
     
     def d(self, expr):
         print("DEBUG", type(expr), expr)
