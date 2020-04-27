@@ -43,6 +43,7 @@ class test_VecDot(u.TestCase, CommonTest):
         func(v1, x)
         func(v1, v1.mag)
         func(zero, 0)
+        func(nabla, nabla)
     
     def test_is_vector(self):
         v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()

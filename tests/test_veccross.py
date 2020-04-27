@@ -41,6 +41,7 @@ class test_VecCross(u.TestCase, CommonTest):
         func(v1 & v2, v1.mag)
         func(v1 & v2, v1)
         func(0, v1)
+        func(nabla, nabla)
     
     def test_is_vector(self):
         v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()

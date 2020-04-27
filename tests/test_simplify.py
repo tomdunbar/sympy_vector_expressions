@@ -9,12 +9,13 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir) 
 
 from vector_expr import (
-    VecAdd, VecMul, VecDot, VecCross, VectorSymbol, VectorZero, VectorOne, Nabla
+    VecAdd, VecMul, VecDot, VecCross, VectorSymbol, 
+    VectorZero, VectorOne, Nabla, Grad, Laplace, DotNablaOp
 )
 
 from vector_simplify import (
     bac_cab_backward, bac_cab_forward, find_bac_cab, bac_cab,
-    dot_cross, collect, collect_cross_dot, simplify
+    dot_cross, collect, collect_cross_dot, simplify, identities
 )
 
 class test_Simplify(u.TestCase, CommonTest):
@@ -510,8 +511,151 @@ class test_Simplify(u.TestCase, CommonTest):
             simplify(expr),
             (a & (b + c)) + ((d + f) & e)
         )   
-        
+    
+    def test_identities(self):
+        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        a, b, c, d, e, f, g, h = self.vector_symbols
+        x, y, z = self.symbols
 
+        # Identity C
+        expr = (nabla & (x * a))
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, prod_div=True),
+            (Grad(x) & a) + (x * (nabla & a))
+        )
+
+        expr = (nabla & (x * a)) + 4 * (nabla & (y * a))
+        assert self._check_args(
+            identities(expr, prod_div=True),
+            (Grad(x) & a) + (x * (nabla & a)) + 4 * (Grad(y) & a) + 4 * (y * (nabla & a))
+        )
+
+        # Identity D
+        expr = (nabla ^ (x * a))
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, prod_curl=True),
+            (Grad(x) ^ a) + (x * (nabla ^ a))
+        )
+
+        expr = (nabla ^ (x * a)) + 4 * (nabla ^ (y * a))
+        assert self._check_args(
+            identities(expr, prod_curl=True),
+            (Grad(x) ^ a) + (x * (nabla ^ a)) + 4 * ((Grad(y) ^ a) + (y * (nabla ^ a)))
+        )
+
+        # Identity E
+        expr = (nabla & (a ^ b))
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, div_of_cross=True),
+            ((nabla ^ a) & b) - ((nabla ^ b) & a)
+        )
+
+        expr = (nabla & (a ^ b)) + 4 * (nabla & (c ^ d))
+        assert self._check_args(
+            identities(expr, div_of_cross=True),
+            ((nabla ^ a) & b) - ((nabla ^ b) & a) + 4 * (((nabla ^ c) & d) - ((nabla ^ d) & c))
+        )
+
+        # Identity F
+        expr = (nabla ^ (a ^ b))
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, curl_of_cross=True),
+            ((nabla & b) * a) + DotNablaOp(b, a) - ((nabla & a) * b) - DotNablaOp(a, b)
+        )
+
+        expr = (nabla ^ (a ^ b)) + 4 * (nabla ^ (c ^ d))
+        assert self._check_args(
+            identities(expr, curl_of_cross=True),
+            (((nabla & b) * a) + DotNablaOp(b, a) - ((nabla & a) * b) - DotNablaOp(a, b)
+            + 4 * (((nabla & d) * c) + DotNablaOp(d, c) - ((nabla & c) * d) - DotNablaOp(c, d)))
+        )
+
+        # Identity G
+        expr = Grad(a & b)
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, grad_of_dot=True),
+            DotNablaOp(a, b) + DotNablaOp(b, a) + (a ^ (nabla ^ b)) + (b ^ (nabla ^ a))
+        )
+
+        expr = Grad(a & b) + 4 * Grad(c & d)
+        assert self._check_args(
+            identities(expr, grad_of_dot=True),
+            (DotNablaOp(a, b) + DotNablaOp(b, a) + (a ^ (nabla ^ b)) + (b ^ (nabla ^ a))
+            + 4 * (DotNablaOp(c, d) + DotNablaOp(d, c) + (c ^ (nabla ^ d)) + (d ^ (nabla ^ c))))
+        )
+
+        # Identity H
+        expr = nabla ^ Grad(x)
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, curl_of_grad=True),
+            VectorZero()
+        )
+
+        expr = (nabla ^ Grad(x)) + 4 * (nabla ^ Grad(y))
+        assert self._check_args(
+            identities(expr, curl_of_grad=True),
+            VectorZero()
+        )
+
+        # Identity I
+        expr = nabla & (nabla ^ a)
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, div_of_curl=True),
+            S.Zero
+        )
+
+        expr = (nabla & (nabla ^ a)) + 4 * (nabla & (nabla ^ b))
+        assert self._check_args(
+            identities(expr, div_of_curl=True),
+            S.Zero
+        )
+
+        # Identity J
+        expr = nabla ^ (nabla ^ a)
+        assert self._check_args(
+            expr,
+            identities(expr)
+        )
+        assert self._check_args(
+            identities(expr, curl_of_curl=True),
+            Grad(nabla & a) - Laplace(a)
+        )
+
+        expr = (nabla ^ (nabla ^ a)) + 4 * (nabla ^ (nabla ^ b))
+        assert self._check_args(
+            identities(expr, curl_of_curl=True),
+            Grad(nabla & a) - Laplace(a) + 4 * (Grad(nabla & b) - Laplace(b))
+        )
+        
+    
 
 if __name__ == "__main__":
     u.main()

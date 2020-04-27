@@ -6,7 +6,8 @@ from sympy.printing.conventions import split_super_sub, requires_partial
 from sympy.core.compatibility import Iterable
 from vector_expr import (
     VecAdd, VecCross, VecDot, VecMul, VecPow, VectorExpr,
-    Magnitude, Normalize, VectorSymbol, VectorOne, VectorZero, D
+    Magnitude, Normalize, VectorSymbol, VectorOne, VectorZero, 
+    D, Grad
 )
 
 # TODO:
@@ -124,8 +125,38 @@ class MyLatexPrinter(LatexPrinter):
 
             return result
         return vec_symbol % expr
+    
+    def _print_DotNablaOp(self, expr):
+        v, f, n = expr.args
+        # print("_print_DotNablaOp", v, n, f)
+        # use VecDot and not & because v, n could be instances of 
+        # Vector; using & it will be evaluated to a scalar.
+        dot = r"\left(%s\right)" % self._print_VecDot(VecDot(v, n))
+        field = self._print(f)
+        if isinstance(f, (sp.Add, sp.Mul, sp.Pow, VecCross, VecDot)):
+            field = r"\left(%s\right)" % field
+        return "%s%s" % (dot, field)
 
+    
+    def _print_Grad(self, expr):
+        if isinstance(expr, VectorExpr):
+            n, f = expr.args
+            flatex = self._print(f)
+            if isinstance(f, VecDot):
+                flatex = r"\left(%s\right)" % flatex
+            return r"%s %s" % (self._print(n), flatex)
+        return super()._print_Gradient(expr)
+    
+    def _print_Laplace(self, expr):
+        n, f = expr.args
+        flatex = self.parenthesize(f, precedence_traditional(expr), True)
+        if isinstance(f, (VecDot, VecCross)):
+            flatex = r"\left(%s\right)" % flatex
+        return r"%s^{2} %s" % (self._print(n),
+            flatex)
+        
     def _print_VecDot(self, expr):
+        # print("_print_VecDot", expr.args)
         expr1, expr2 = expr.args
         s1 = _wrap_cross_dot_arg(self, expr1)
         s2 = _wrap_cross_dot_arg(self, expr2)

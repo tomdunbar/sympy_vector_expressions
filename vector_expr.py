@@ -1,13 +1,14 @@
 # import sympy as sp
 from sympy import (
     sympify, S, Basic, Expr, Derivative, Abs, Mul, Add, Pow, 
-    Symbol, Number, log, Wild
+    Symbol, Number, log, Wild, fraction
 )
 from sympy.core.compatibility import (
     string_types, default_sort_key, with_metaclass, reduce
 )
 from sympy.core.decorators import call_highest_priority, _sympifyit
 from sympy.core.evalf import EvalfMixin
+from sympy.core.function import UndefinedFunction
 from sympy.core.operations import AssocOp
 from sympy.core.singleton import Singleton
 from sympy.strategies import flatten
@@ -15,8 +16,12 @@ from sympy.utilities.iterables import ordered
 
 from sympy.vector import (
     Vector, 
-    divergence, curl
+    divergence, curl, gradient
 )
+
+# TODO:
+# 1. Fix Del Operator:
+#       https://en.wikipedia.org/wiki/Del
 
 class VectorExpr(Expr):
     """ Superclass for vector expressions.
@@ -32,7 +37,7 @@ class VectorExpr(Expr):
     is_VectorExpr = True
     is_Cross = False
     is_Dot = False
-    is_Grad = False
+    is_Gradient = False
     is_Div = False
     is_Curl = False
     is_Normalized = False
@@ -110,6 +115,10 @@ class VectorExpr(Expr):
     @_sympifyit('other', NotImplemented)
     def __and__(self, other):
         return VecDot(self, other)
+    
+    # @_sympifyit('other', NotImplemented)
+    # def __or__(self, other):
+    #     return Grad(self, other)
     
     @_sympifyit('other', NotImplemented)
     @call_highest_priority('__rmul__')
@@ -199,7 +208,9 @@ class VectorExpr(Expr):
     # the gradient of a vector is a matrix!!!
     # the gradient of a scalar is a vector!!!
     def gradient(self):
-        raise NotImplementedError("Gradient not implemented")
+        if self.is_Vector:
+            raise NotImplementedError("Gradient of vectors not implemented")
+        return Grad(self)
     
     @property
     def grad(self):
@@ -218,27 +229,42 @@ class VectorExpr(Expr):
     @property
     def cu(self):
         return self.curl()
+
+    def laplace(self):
+        return Laplace(self)
+    
+    @property
+    def lap(self):
+        return self.laplace()
     
     def expand(self, deep=True, modulus=None, power_base=True, power_exp=True,
             mul=True, log=True, multinomial=True, basic=True, **hints):
         if isinstance(self, VectorSymbol):
             return self
 
+        _spaces.append(_token)
+        debug("VectorExpr expand", self)
         # first expand dot and cross products
         A, B = [WVS(t) for t in ["A", "B"]]
         def func(expr, pattern, prev=None):
+            # debug("\n", hints)
             old = expr
             found = list(ordered(list(expr.find(pattern))))
+            # debug("found", found)
             for f in found:
-                fexp = f.expand()
+                fexp = f.expand(**hints)
+                # debug("\t fexp", fexp)
                 if f != fexp:
-                    expr = expr.xreplace({f: f.expand()})
-            
+                    expr = expr.xreplace({f: fexp})
+            # debug("expr", expr)
             if old != expr:
                 expr = func(expr, pattern)
             return expr
         expr = func(self, A ^ B)
         expr = func(expr, A & B)
+        expr = func(expr, Grad)
+
+        del _spaces[-1]
         return Expr.expand(expr, deep=deep, modulus=modulus, power_base=power_base,
             power_exp=power_exp, mul=mul, log=log, multinomial=multinomial, 
             basic=basic, **hints)
@@ -348,6 +374,14 @@ class VectorSymbol(VectorExpr):
     def name(self):
         return self.args[0].name
     
+    @_sympifyit('other', NotImplemented)
+    def dot(self, other):
+        return VecDot(self, other)
+    
+    @_sympifyit('other', NotImplemented)
+    def cross(self, other):
+        return VecCross(self, other)
+    
 # class VectorZero(with_metaclass(Singleton, VectorSymbol)):
 class VectorZero(VectorSymbol):
     is_ZeroVector = True
@@ -383,6 +417,17 @@ class Nabla(VectorSymbol):
 
     def normalize(self):
         raise TypeError("nabla operator cannot be normalized.")
+    
+    @_sympifyit('other', NotImplemented)
+    def gradient(self, other):
+        return Grad(self, other)
+    
+    @_sympifyit('other', NotImplemented)
+    def laplace(self, other):
+        return Laplace(self, other)
+    
+    grad = gradient
+    lap = laplace
 
     def _eval_derivative(self, s):
         raise NotImplementedError("Differentiation of nabla operator not implemented.")
@@ -530,14 +575,20 @@ class DotCross(VectorExpr):
         return t1 + t2
     
     def expand(self, **hints):
+        _spaces.append(_token)
+        debug("DotCross expand", self)
         left = self.args[0].expand()
         right = self.args[1].expand()
+        debug("\t", left, right)
         if not (isinstance(left, VecAdd) or isinstance(right, VecAdd)):
+            debug("\t ASD0 not VecAdd", self.func(left, right))
+            del _spaces[-1]
             return self.func(left, right)
         get_args = lambda expr: expr.args if isinstance(expr, VecAdd) else [expr]
         left = get_args(left)
         right = get_args(right)
-
+        debug("\t ASD1 left", left)
+        debug("\t ASD2 right", right)
         def _get_vector(expr):
             if isinstance(expr, (VectorSymbol, VecCross, VecDot)):
                 return expr
@@ -559,6 +610,8 @@ class DotCross(VectorExpr):
                 vr = _get_vector(r)
                 c = cl * cr
                 terms.append(c * self.func(vl, vr))
+        debug("\t ASD3 terms", terms)
+        del _spaces[-1]
         return VecAdd(*terms)
 
 class VecDot(DotCross):
@@ -582,6 +635,9 @@ class VecDot(DotCross):
         )
         if expr1 == VectorZero() or expr2 == VectorZero():
             return S.Zero
+        if expr1 == expr2 and isinstance(expr1, Nabla):
+            raise TypeError("Dot product of two nabla operators not supported.\n" +
+                "To create the Laplacian operator, use the class Laplace.")
     
         obj = Expr.__new__(cls, expr1, expr2)
         return obj
@@ -594,18 +650,21 @@ class VecDot(DotCross):
 
     def doit(self, **kwargs):
         deep = kwargs.get('deep', True)
-        if isinstance(self.args[0], Vector) and \
-            isinstance(self.args[1], Vector):
-            return self.args[0].dot(self.args[1])
-        if isinstance(self.args[0], Vector) and \
-            isinstance(self.args[1], Nabla):
-            return divergence(self.args[0])
-        if isinstance(self.args[1], Vector) and \
-            isinstance(self.args[0], Nabla):
-            return divergence(self.args[1])
+
         args = self.args
         if deep:
-            args = [arg.doit(**kwargs) for arg in self.args]
+            args = [arg.doit(**kwargs) for arg in args]
+
+        if isinstance(args[0], Vector) and \
+            isinstance(args[1], Vector):
+            return args[0].dot(args[1])
+        if isinstance(args[0], Vector) and \
+            isinstance(args[1], Nabla):
+            return divergence(args[0])
+        if isinstance(args[1], Vector) and \
+            isinstance(args[0], Nabla):
+            return divergence(args[1])
+        
         if args[0] == args[1]:
             return VecPow(args[0].mag, 2)
         return self.func(*args)
@@ -638,6 +697,8 @@ class VecCross(DotCross):
             # TODO: At this point I'm dealing with unevaluated cross product.
             # is it better to return VectorZero()?
             return expr1.zero
+        if expr1 == expr2 and isinstance(expr1, Nabla):
+            raise TypeError("Cross product of two nabla operators not supported.")
         if expr1 == expr2:
             return VectorZero()
 
@@ -652,19 +713,72 @@ class VecCross(DotCross):
     
     def doit(self, **kwargs):
         deep = kwargs.get('deep', True)
-        if isinstance(self.args[0], Vector) and \
-            isinstance(self.args[1], Vector):
-            return self.args[0].cross(self.args[1])
-        if isinstance(self.args[0], Vector) and \
-            isinstance(self.args[1], Nabla):
-            return -curl(self.args[0])
-        if isinstance(self.args[1], Vector) and \
-            isinstance(self.args[0], Nabla):
-            return curl(self.args[1])
+
         args = self.args
         if deep:
-            args = [arg.doit(**kwargs) for arg in self.args]
+            args = [arg.doit(**kwargs) for arg in args]
+
+        if isinstance(args[0], Vector) and \
+            isinstance(args[1], Vector):
+            return args[0].cross(args[1])
+        if isinstance(args[0], Vector) and \
+            isinstance(args[1], Nabla):
+            return -curl(args[0])
+        if isinstance(args[1], Vector) and \
+            isinstance(args[0], Nabla):
+            return curl(args[1])
+
         return self.func(*args)
+
+
+class DotNablaOp(VectorExpr):
+    """ Symbolic representation of the following operator/expression:
+        (v & nabla) * f
+    where:
+        v : vector
+        f : vector or scalar field
+    Note that this is different than (nabla & v) * f, because (nabla & v) is the
+    divergence of v.
+    """
+    is_Vector = True
+    is_Vector_Scalar = False
+    is_commutative = False
+
+    def __new__(cls, v, f, n = Nabla()):
+        v = sympify(v)
+        f = sympify(f)
+        if not isinstance(n, Nabla):
+            raise TypeError("n must be an instance of the class Nabla.")
+        if (not v.is_Vector) or isinstance(v, Nabla):
+            raise TypeError("v must be a vector or an expression with is_Vector=True. It must not be nabla.")
+        if isinstance(f, Nabla):
+            raise TypeError("f (the field) cannot be nabla.")
+
+        obj = Expr.__new__(cls, v, f, n)
+        obj.is_Vector = v.is_Vector
+        obj.is_Vector_Scalar = not v.is_Vector
+        return obj
+    
+    def doit(self, **kwargs):
+        deep = kwargs.get('deep', True)
+
+        args = self.args
+        if deep:
+            args = [arg.doit(**kwargs) for arg in args]
+        
+        v, f, n= args
+        if not f.is_Vector and isinstance(v, Vector):
+            return v & Grad(f).doit(**kwargs)
+        if isinstance(f, Vector) and isinstance(v, Vector):
+            s = Vector.zero
+            for e, comp in f.components.items():
+                s += e * DotNablaOp(v, comp).doit(**kwargs)
+            return s
+
+        return self.func(*args)
+    
+    #TODO: implement expand?
+
 
 # used for debugging the expressions trees: append a _token to _spaces each time
 # an object is created. Remember to remove the token once the object has been
@@ -675,6 +789,135 @@ _DEBUG = False
 def debug(*args):
     if _DEBUG:
         print("".join(_spaces), *args)
+
+# _print_Gradient is already used in pretty_print, hence the name Gradient
+class Grad(VectorExpr):
+    """ Symbolic representation of the gradient of a scalar field.
+    """
+    is_Vector = True
+    is_Vector_Scalar = False
+    
+    def __new__(cls, arg1, arg2=None, **kwargs):
+        # Ideally, only the scalar field is required. However, it can
+        # accept also the nabla operator (in case of some rendering
+        # customization)
+        if not arg2:
+            n = Nabla()
+            f = sympify(arg1)
+        else:
+            n = sympify(arg1)
+            f = sympify(arg2)
+        
+        if not isinstance(n, Nabla):
+            raise TypeError("The first argument of the gradient operator must be Nabla.")
+        if isinstance(f, Nabla):
+            raise NotImplementedError("Differentiation of nabla operator not implemented.")
+        if f.is_Vector:
+            raise TypeError("Gradient of vector fields not implemented.")
+        return Basic.__new__(cls, n, f)
+    
+    def doit(self, **kwargs):
+        deep = kwargs.get('deep', True)
+        args = self.args
+        if deep:
+            args = [arg.doit(**kwargs) for arg in args]
+
+        # TODO: is the following condition ok?
+        if not isinstance(args[1], VectorExpr):
+            return gradient(args[1])
+        return self.func(*args)
+    
+    def expand(self, **hints):
+        prod = hints.get('prod', False)
+        quotient = hints.get('quotient', False)
+
+        if isinstance(self.args[1], Add):
+            return VecAdd(*[self.func(a).expand(**hints) for a in self.args[1].args])
+        
+        # if isinstance(self.args[1], Mul):
+        num, den = fraction(self.args[1])
+        if den != S.One and quotient:
+            # quotient rule
+            return (den * Grad(num) - num * Grad(den)) / den**2
+        if prod and den == 1:
+            # product rule Grad(x * y) = x * Grad(y) + y * Grad(x)
+            args = self.args[1].args
+            if len(args) > 1:
+                new_args = []
+                for i, a in enumerate(args):
+                    new_args.append(
+                        VecMul(*args[:i], *args[i+1:], self.func(a))
+                    )
+                return VecAdd(*new_args)
+            return self
+        return self
+
+class Laplace(VectorExpr):
+    """ Symbolic representation of the Laplacian operator.
+    """
+    is_Vector = False
+    is_Vector_Scalar = True
+    
+    def __new__(cls, arg1, arg2=None, **kwargs):
+        # Ideally, only the scalar/vector field is required. However, it can
+        # accept also the nabla operator (in case of some rendering
+        # customization)
+        if not arg2:
+            n = Nabla()
+            f = sympify(arg1)
+        else:
+            n = sympify(arg1)
+            f = sympify(arg2)
+        
+        if not isinstance(n, Nabla):
+            raise TypeError("The first argument of the laplace operator must be Nabla.")
+        if isinstance(f, Nabla):
+            raise NotImplementedError("Differentiation of nabla operator not implemented.")
+        # if f.is_Vector:
+        #     raise TypeError("Gradient of vector fields not implemented.")
+        obj = Basic.__new__(cls, n, f)
+        if f.is_Vector:
+            obj.is_Vector = True
+            obj.is_Vector_Scalar = False
+        return obj
+    
+    def doit(self, **kwargs):
+        deep = kwargs.get('deep', True)
+        args = self.args
+        if deep:
+            args = [arg.doit(**kwargs) for arg in args]
+
+        if not isinstance(args[1], (Vector, VectorExpr)):
+            # scalar field: we use the identity nabla^2 = nabla.div(f.grad())
+            return VecDot(args[0], Grad(args[0], args[1])).doit(deep=deep)
+        elif isinstance(args[1], Vector):
+            components = args[1].components
+            laplace = lambda c: VecDot(args[0], Grad(args[0], c)).doit()
+            v = Vector.zero
+            for base, comp in components.items():
+                v += base * laplace(comp)
+            return v
+        return self.func(*args)
+    
+    def expand(self, **hints):
+        laplacian = hints.get('laplacian', False)
+        prod = hints.get('prod', False)
+        if laplacian:
+            if isinstance(self.args[1], Add):
+                expr = VecAdd(*[self.func(a).expand(**hints) for a in self.args[1].args])
+                return expr
+            if prod:
+                # product rule:
+                # Laplace(x * y) = x * Lap(y) + 2 * (Grad(f) & Grad(y)) + y * Lap(x)
+                raise NotImplementedError("Laplacian Operator Product Rule not implemented")
+                args = self.args[1].args
+                new_args = []
+                for i, a in enumerate(args):
+                    new_args.append(
+                        VecMul(*args[:i], *args[i+1:], self.func(a))
+                    )
+                return VecAdd(*new_args)
+        return self
 
 
 def _check_if_scalar(expr):
@@ -856,6 +1099,20 @@ class VecMul(VectorExpr, Mul):
             # doesn't make any sense to have 1 argument in VecAdd if 
             # evaluate=True
             return args[0]
+        
+        # TODO: look through args (which are unprocessed as of now) for
+        # (a & nabla) * x (where x can be a scalar field or a vector field)
+        dot, field = None, None
+        skip_idx = []
+        dot_field = []
+        for i in range(len(args) - 1):
+            if isinstance(args[i], VecDot) and isinstance(args[i].args[1], Nabla):
+                dot = args[i]
+                field = args[i + 1]
+                skip_idx.extend([i, i + 1])
+        
+
+        
         
         vectors = [a.is_Vector for a in args]
         if vectors.count(True) > 1:

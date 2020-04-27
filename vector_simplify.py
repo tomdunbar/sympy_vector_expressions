@@ -1,11 +1,13 @@
 from itertools import combinations
+from collections import OrderedDict
 from sympy import (
-    Mul, Add, Abs, preorder_traversal, collect_const
+    S, Mul, Add, Abs, preorder_traversal, collect_const, Wild
 )
 from sympy.utilities.iterables import ordered
 from vector_expr import (
     VectorExpr, VecAdd, VecMul, VecPow, VecDot, VecCross, 
-    Magnitude, Normalize, WVS, VectorSymbol, VectorOne, DotCross
+    Magnitude, Normalize, WVS, VectorSymbol, VectorOne, DotCross,
+    Grad, Laplace, VectorZero, Nabla, DotNablaOp
 )
 
 # TODO: 
@@ -13,7 +15,10 @@ from vector_expr import (
 # 2. expr = a.mag * (a ^ b) + a.mag * (a ^ c)
 #    simplify(expr)
 #    a.mag * (a ^ (b + c))
-
+# 3. Fix Del Operator:
+#       https://en.wikipedia.org/wiki/Del
+# 4. Vector Identities
+#       https://en.wikipedia.org/wiki/Vector_calculus_identities
 
 def _find_and_replace(expr, pattern, rep, matches=None):
     """ Given an expression, a search `pattern` and a replacement 
@@ -416,6 +421,20 @@ def _dot_to_mag(expr):
         expr = expr.subs(f, f.args[0].mag**2)
     return expr
 
+def _curl_of_grad(expr):
+    w = Wild("w")
+    found = expr.find(Nabla() ^ Grad(w))
+    for f in found:
+        expr = expr.subs(f, VectorZero())
+    return expr
+
+def _div_of_curl(expr):
+    w = WVS("w")
+    found = expr.find(Nabla() & (Nabla() ^ w))
+    for f in found:
+        expr = expr.subs(f, S.Zero)
+    return expr
+
 def simplify(expr, **kwargs):
     """ Apply a few simplification rules to expr.
 
@@ -443,8 +462,18 @@ def simplify(expr, **kwargs):
     dot = kwargs.get('dot', True)
     cross = kwargs.get('cross', True)
     
-    A, B, C = [WVS(t) for t in ["A", "B", "C"]]    
-    
+    A, B, C = [WVS(t) for t in ["A", "B", "C"]]   
+
+    # Identity H: nabla ^ (Grad(x)) = 0
+    expr = _curl_of_grad(expr)
+    # Identity I: nabla & (nabla ^ a) = 0
+    expr = _div_of_curl(expr)
+
+    ############################################################################
+    ###################### RULE 0: Identities H and I ##########################
+    ############################################################################
+    expr = identities(expr, curl_of_grad=True, div_of_curl=True)
+
     ############################################################################
     ###################### RULE 1: (v & v) = v.mag**2 ##########################
     ############################################################################
@@ -491,3 +520,100 @@ def simplify(expr, **kwargs):
         expr = _dot_to_mag(expr)
 
     return expr
+
+w = Wild("w")
+wa = WVS("w_a")
+wb = WVS("w_b")
+nabla = Nabla()
+
+_id = {
+    # Identity C
+    "prod_div": [
+        nabla & (w * wa),
+        (Grad(w) & wa) + (w * (nabla & wa))
+    ],
+    # Identity D
+    "prod_curl": [
+        nabla ^ (w * wa),
+        (Grad(w) ^ wa) + (w * (nabla ^ wa))
+    ],
+    # Identity E
+    "div_of_cross": [
+        nabla & (wa ^ wb),
+        ((nabla ^ wa) & wb) - ((nabla ^ wb) & wa)
+    ],
+    # Identity F
+    "curl_of_cross": [
+        nabla ^ (wa ^ wb),
+        ((nabla & wb) * wa) + DotNablaOp(wb, wa) - ((nabla & wa) * wb) - DotNablaOp(wa, wb)
+    ],
+    # Identity G
+    "grad_of_dot": [
+        Grad(wa & wb),
+        DotNablaOp(wa, wb) + DotNablaOp(wb, wa) + (wa ^ (nabla ^ wb)) + (wb ^ (nabla ^ wa))
+    ],
+    # Identity H
+    "curl_of_grad": [
+        nabla ^ Grad(w),
+        VectorZero()
+    ],
+    # Identity I
+    "div_of_curl": [
+        nabla & (nabla ^ wa),
+        S.Zero
+    ],
+    # Identity J
+    "curl_of_curl": [
+        nabla ^ (nabla ^ wa),
+        Grad(nabla & wa) - Laplace(wa)
+    ],
+}
+
+def identities(expr, **hints):
+    """ Apply to expr the identities specified in **hints.
+
+    In the following, w is scalar, wa/wb are vectors.
+
+    Hints: set a flag to True to apply the identity. By default all
+    flags are set to False.
+
+        prod_div = True
+            nabla & (w * wa) = (Grad(w) & wa) + (w * (nabla & wa))
+        
+        prod_curl = True
+            nabla ^ (w * wa) = (Grad(w) ^ wa) + (w * (nabla ^ wa))
+        
+        div_of_cross = True
+            nabla & (wa ^ wb) = ((nabla ^ wa) & wb) - ((nabla ^ wb) & wa)
+        
+        curl_of_cross = True
+            nabla ^ (wa ^ wb) = ((nabla & wb) * wa) + DotNablaOp(wb, wa) - ((nabla & wa) * wb) - DotNablaOp(wa, wb)
+        
+        grad_of_dot = True
+            Grad(wa & wb) = DotNablaOp(wa, wb) + DotNablaOp(wb, wa) + (wa ^ (nabla ^ wb)) + (wb ^ (nabla ^ wa))
+        
+        curl_of_grad = True
+            nabla ^ Grad(w) = VectorZero()
+
+        div_of_curl = True
+            nabla & (nabla ^ wa) = S.Zero
+
+        curl_of_curl = True
+            nabla ^ (nabla ^ wa) = Grad(nabla & wa) - Laplace(wa)
+    """
+
+    for hint, val in hints.items():
+        if hint in _id.keys() and (val == True):
+            pattern, subs = _id[hint]
+            found = list(ordered(list(expr.find(pattern))))
+            for i, f in enumerate(found):
+                fsubs = subs.xreplace(f.match(pattern))
+                # update found list
+                for j in range(i + 1, len(found)):
+                    found[j] = found[j].subs(f, fsubs)
+                expr = expr.subs(f, fsubs)
+    return expr
+
+# TODO:
+# 1. Nested identities "prod_div" and "prod_curl" don't work.
+# 

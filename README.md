@@ -22,6 +22,8 @@ Unfortunately, vector expressions (involving dot and cross products, magnitude, 
 
 ![identities](imgs/img-3.png)
 
+![identities](imgs/img-10.png)
+
 ### Expansion
 
 ![Expansion](imgs/img-4.png)
@@ -43,5 +45,6 @@ Unfortunately, vector expressions (involving dot and cross products, magnitude, 
 * Operation precedence.
 * Printing need some works.
 * General derivatives of vector expressions.
+* Integrals of vector expressions.
 * Solve for vector expressions.
-* Gradient: the gradient of a scalar field is a vector; the gradient of a vector field is a tensor (matrix). Is it possible to implement them in this module? Is it possible to integrate them with tensor and linear algebra modules?
+* Gradient: the gradient of a vector field is a tensor (matrix). Is it possible to implement them in this module? Specifically, is it possible to substitute a tensor/matrix into a vector expression and perform the evaluation? Is it possible to integrate them with tensor and linear algebra modules?
