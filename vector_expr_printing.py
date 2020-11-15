@@ -20,7 +20,7 @@ def vector_latex(expr, fold_frac_powers=False, fold_func_brackets=False,
           fold_short_frac=None, inv_trig_style="abbreviated",
           itex=False, ln_notation=False, long_frac_ratio=None,
           mat_delim="[", mat_str=None, mode="plain", mul_symbol=None,
-          order=None, symbol_names=None, root_notation=True,
+          order="none", symbol_names=None, root_notation=True,
           mat_symbol_style="plain", imaginary_unit="i", gothic_re_im=False,
           decimal_separator="period", vec_symbol=r"\vec{%s}", unit_vec_symbol=r"\hat{%s}",
             normalize_style="frac"):
@@ -52,9 +52,9 @@ def vector_latex(expr, fold_frac_powers=False, fold_func_brackets=False,
         'normalize_style': normalize_style,
     }
 
-    return MyLatexPrinter(settings).doprint(expr)
+    return VectorLatexPrinter(settings).doprint(expr)
 
-class MyLatexPrinter(LatexPrinter):
+class VectorLatexPrinter(LatexPrinter):
     _default_settings = {
         "fold_frac_powers": False,
         "fold_func_brackets": False,
@@ -126,12 +126,15 @@ class MyLatexPrinter(LatexPrinter):
             return result
         return vec_symbol % expr
     
-    def _print_DotNablaOp(self, expr):
+    def _print_Advection(self, expr):
         v, f, n = expr.args
-        # print("_print_DotNablaOp", v, n, f)
         # use VecDot and not & because v, n could be instances of 
         # Vector; using & it will be evaluated to a scalar.
-        dot = r"\left(%s\right)" % self._print_VecDot(VecDot(v, n))
+        # dot = r"\left(%s\right)" % self._print_VecDot(VecDot(v, n))
+        e = sp.Basic.__new__(sp.Expr, v, n)
+        # print("osdbhfdskòojsdbbfdskjbsdfòkjbsdflkj")
+        # print(e, e.args)
+        dot = r"\left(%s\right)" % self._print_VecDot(e)
         field = self._print(f)
         if isinstance(f, (sp.Add, sp.Mul, sp.Pow, VecCross, VecDot)):
             field = r"\left(%s\right)" % field
@@ -142,7 +145,7 @@ class MyLatexPrinter(LatexPrinter):
         if isinstance(expr, VectorExpr):
             n, f = expr.args
             flatex = self._print(f)
-            if isinstance(f, VecDot):
+            if isinstance(f, (VecDot, sp.Add, sp.Mul, sp.Pow)):
                 flatex = r"\left(%s\right)" % flatex
             return r"%s %s" % (self._print(n), flatex)
         return super()._print_Gradient(expr)
@@ -183,7 +186,7 @@ class MyLatexPrinter(LatexPrinter):
     def _print_Magnitude(self, expr):
         v = expr.args[0]
         return r"\|%s\|" % self.parenthesize(v, precedence_traditional(expr), True)
-        
+    
     def _print_VecPow(self, expr):
         base, exp = expr.base, expr.exp
         if exp == sp.S.NegativeOne:
@@ -205,7 +208,7 @@ class MyLatexPrinter(LatexPrinter):
         return self._print_Derivative(expr.args[0])
     
     def _print_Derivative(self, expr):
-        if upgraded_requires_partial(expr.expr):
+        if upgraded_requires_partial(expr.expr, len(expr.variable_count) > 1):
             diff_symbol = r'\partial'
         else:
             diff_symbol = r'd'
@@ -364,7 +367,7 @@ def _wrap_cross_dot_arg(printer, expr):
         s = r"\left(%s\right)" % s
     return s
 
-def upgraded_requires_partial(expr):
+def upgraded_requires_partial(expr, multiv=False):
     """Return whether a partial derivative symbol is required for printing
     This requires checking how many free variables there are,
     filtering out the ones that are integers. Some expressions don't have
@@ -375,8 +378,13 @@ def upgraded_requires_partial(expr):
     # TODO: because at the moment I only implemented univariate derivative,
     # I can return False. Once partial derivatives are implemented, need to
     # figure out a way to return the correct value.
-    if isinstance(expr, VectorExpr):
-        return False
+    if isinstance(expr, VectorExpr) and multiv:
+        return True
+        print("asd")
+        print(expr, type(expr))
+        print(expr.args[0], type(expr).args[0])
+        expr = expr.args[0]
+        # return False
 
     if isinstance(expr, sp.Derivative):
         return upgraded_requires_partial(expr.expr)

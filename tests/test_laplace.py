@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Add, sqrt, S, log, sin, pi
 from sympy.vector import (
     CoordSys3D, Vector, VectorZero as VZero, 
@@ -22,7 +22,7 @@ class test_Laplace(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         # gradient of scalar fields
         # TODO: separate scalar fields from constants symbols, numbers, ...
@@ -32,12 +32,9 @@ class test_Laplace(u.TestCase, CommonTest):
         assert isinstance(v1.lap, Laplace)
         # laplacian of scalar field is scalar
         assert not Laplace(x).is_Vector
-        assert Laplace(x).is_Vector_Scalar
         # laplacian of vector field is vector
         assert Laplace(v1).is_Vector
-        assert not Laplace(v1).is_Vector_Scalar
         assert Laplace(vn1).is_Vector
-        assert not Laplace(vn1).is_Vector_Scalar
 
         # laplacian of scalar field
         v = C.x * C.y * C.z
@@ -59,7 +56,7 @@ class test_Laplace(u.TestCase, CommonTest):
         func(v1, x)
         
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         # NOTE: the following tests come from:
         # https://www.plymouth.ac.uk/uploads/production/document/path/3/3744/PlymouthUniversity_MathsandStats_the_Laplacian.pdf
@@ -171,6 +168,92 @@ class test_Laplace(u.TestCase, CommonTest):
             -C.i + 2 * C.j
         )
         assert isinstance(Laplace(v).doit(deep=False), Vector)
+
+    def test_expand(self):
+        a, b, c, d, e, f, g, h = self.vector_symbols
+        x, y, z = self.symbols
+
+        # Laplacian with scalar fields
+        expr = Laplace(x * y)
+        self._check_args(
+            expr.expand(),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True, prod=True),
+            x * Laplace(y) + y * Laplace(x) + 2 * (Grad(x) & Grad(y))
+        )
+        self._check_args(
+            expr.expand(prod=True),
+            expr
+        )
+
+        expr = Laplace(x + y)
+        self._check_args(
+            expr.expand(),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True),
+            Laplace(x) + Laplace(y)
+        )
+
+        expr = Laplace(x + x * y)
+        self._check_args(
+            expr.expand(),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True),
+            Laplace(x) + Laplace(x * y)
+        )
+        self._check_args(
+            expr.expand(laplacian=True, prod=True),
+            Laplace(x) + x * Laplace(y) + y * Laplace(x) + 2 * (Grad(x) & Grad(y))
+        )
+
+        # Laplacian with vector fields
+        expr = Laplace(a + b)
+        self._check_args(
+            expr.expand(),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True),
+            Laplace(a) + Laplace(b)
+        )
+
+        expr = Laplace(a.mag * b)
+        self._check_args(
+            expr.expand(),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True, prod=True),
+            expr
+        )
+
+        expr = Laplace(a.mag * b + c)
+        self._check_args(
+            expr.expand(),
+            expr
+        )
+        self._check_args(
+            expr.expand(laplacian=True),
+            Laplace(a.mag * b) + Laplace(c)
+        )
+        self._check_args(
+            expr.expand(laplacian=True, prod=True),
+            Laplace(a.mag * b) + Laplace(c)
+        )
 
 if __name__ == "__main__":
     u.main()

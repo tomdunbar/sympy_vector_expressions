@@ -10,6 +10,12 @@ Unfortunately, vector expressions (involving dot and cross products, magnitude, 
 
 ![Vector equations image](imgs/img-1.png)
 
+## Update
+
+I feel like the current implementation is not good enough to be extended anymore. In order to use matrices-tensors, the module need to be re-engineered and rewritten.
+
+Take a look at the `tests` folder to see example of this module usage.
+
 ## Features
 
 ### Derivatives
@@ -44,7 +50,6 @@ Unfortunately, vector expressions (involving dot and cross products, magnitude, 
 
 * Operation precedence.
 * Printing need some works.
-* General derivatives of vector expressions.
 * Integrals of vector expressions.
 * Solve for vector expressions.
 * Gradient: the gradient of a vector field is a tensor (matrix). Is it possible to implement them in this module? Specifically, is it possible to substitute a tensor/matrix into a vector expression and perform the evaluation? Is it possible to integrate them with tensor and linear algebra modules?

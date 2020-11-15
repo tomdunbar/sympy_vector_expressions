@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Add, Mul, S, srepr, symbols, Pow
 from sympy.vector import CoordSys3D, Vector, VectorZero as VZero
 
@@ -10,7 +10,7 @@ sys.path.insert(0, parent_dir)
 
 from vector_expr import (
     VecAdd, VecMul, VecDot, VecCross, VectorSymbol, 
-    VectorZero, VectorOne, Nabla, Grad, Laplace, DotNablaOp
+    VectorZero, VectorOne, Nabla, Grad, Laplace, Advection
 )
 
 from vector_simplify import (
@@ -216,83 +216,86 @@ class test_Simplify(u.TestCase, CommonTest):
             (a & c) * (c ^ (b ^ d))
         )
 
-    def test_collect(self):
-        a, b, c, d, e, f, g, h = self.vector_symbols
-        x, y, z = self.symbols
+    # def test_collect(self):
+    #     a, b, c, d, e, f, g, h = self.vector_symbols
+    #     x, y, z = self.symbols
 
-        # collecting dot products
-        expr = (a * (a & b)**3) + (b * (a & b)**2) + self.one
-        sexpr = collect(expr, (a & b))
-        assert self._check_args(
-            sexpr,
-            self.one + (a & b) * ((a & b)**2 * a + (a & b) * b)
-        )
+    #     # collecting dot products
+    #     expr = (a * (a & b)**3) + (b * (a & b)**2) + self.one
+    #     sexpr = collect(expr, (a & b))
+    #     assert self._check_args(
+    #         sexpr,
+    #         self.one + (a & b) * ((a & b)**2 * a + (a & b) * b)
+    #     )
 
-        sexpr = collect(expr, (a & b)**2)
-        assert self._check_args(
-            sexpr,
-            self.one + (a & b)**2 * ((a & b) * a + b)
-        )
+    #     sexpr = collect(expr, (a & b)**2)
+    #     print("ASD")
+    #     print(expr)
+    #     print(sexpr)
+    #     assert self._check_args(
+    #         sexpr,
+    #         (((a & b) * a + b) * (a & b)**2) + self.one
+    #     )
 
-        sexpr = collect(expr, (a & b)**3)
-        assert self._check_args(
-            sexpr,
-            expr
-        )
+    #     sexpr = collect(expr, (a & b)**3)
+    #     assert self._check_args(
+    #         sexpr,
+    #         expr
+    #     )
 
-        expr = a * (a & b)**3 + self.one + b * (a & b)**2 + (a & b) * c
-        sexpr = collect(expr, (a & b))
-        assert self._check_args(
-            sexpr,
-            ((a & b)**2 * a + (a & b) * b + c) * (a & b) + self.one
-        )
+    #     expr = a * (a & b)**3 + self.one + b * (a & b)**2 + (a & b) * c
+    #     sexpr = collect(expr, (a & b))
+    #     assert self._check_args(
+    #         sexpr,
+    #         ((a & b)**2 * a + (a & b) * b + c) * (a & b) + self.one
+    #     )
 
-        sexpr = collect(expr, (a & b)**2)
-        assert self._check_args(
-            sexpr,
-            ((a & b) * a + b) * (a & b)**2 + (a & b) * c + self.one
-        )
+    #     sexpr = collect(expr, (a & b)**2)
+    #     assert self._check_args(
+    #         sexpr,
+    #         ((a & b) * a + b) * (a & b)**2 + (a & b) * c + self.one
+    #     )
 
-        # collect cross product
-        expr = (a ^ b) * c.mag**2 + (a ^ b)
-        sexpr = collect(expr, a ^ b)
-        assert self._check_args(
-            sexpr,
-            (c.mag**2 + 1) * (a ^ b)
-        )
+    #     # collect cross product
+    #     expr = (a ^ b) * c.mag**2 + (a ^ b)
+    #     sexpr = collect(expr, a ^ b)
+    #     assert self._check_args(
+    #         sexpr,
+    #         (c.mag**2 + 1) * (a ^ b)
+    #     )
 
-        expr = x**2 * (a ^ b) * c.mag**2 + (a ^ b) * y
-        sexpr = collect(expr, a ^ b)
-        assert self._check_args(
-            sexpr,
-            (x**2 * c.mag**2 + y) * (a ^ b)
-        )
+    #     expr = x**2 * (a ^ b) * c.mag**2 + (a ^ b) * y
+    #     sexpr = collect(expr, a ^ b)
+    #     assert self._check_args(
+    #         sexpr,
+    #         (x**2 * c.mag**2 + y) * (a ^ b)
+    #     )
 
-        # fall back to expr.collect(match)
-        expr = c.mag * self.one + c.mag * a + c.mag**2 * b + c.mag**3 * c
-        sexpr = collect(expr, c.mag)
-        # TODO: wtf is going on here????????
-        dc = "VecAdd(VecMul(VecAdd(VectorOne(Symbol('1')), VectorSymbol(Symbol('a'))), Magnitude(VectorSymbol(Symbol('c')))), VecMul(Pow(Magnitude(VectorSymbol(Symbol('c'))), Integer(3)), VectorSymbol(Symbol('c'))), VecMul(Pow(Magnitude(VectorSymbol(Symbol('c'))), Integer(2)), VectorSymbol(Symbol('b'))))"
-        assert srepr(sexpr) == dc
-        # assert self._check_args(
-        #     sexpr,
-        #     ((self.one + a) * c.mag) + (Pow(c.mag, 2) * b) + (Pow(c.mag, 3) * c)
-        # #     VecAdd(VecMul(VecAdd(self.one, a), c.mag), VecMul(Pow(c.mag, 3), c), VecMul(Pow(c.mag, 2), b))
-        # )
+    #     # fall back to expr.collect(match)
+    #     expr = c.mag * self.one + c.mag * a + c.mag**2 * b + c.mag**3 * c
+    #     sexpr = collect(expr, c.mag)
+    #     # TODO: wtf is going on here????????
+    #     dc = "VecAdd(VecMul(VecAdd(VectorOne(Symbol('1')), VectorSymbol(Symbol('a'))), Magnitude(VectorSymbol(Symbol('c')))), VecMul(VecPow(Magnitude(VectorSymbol(Symbol('c'))), Integer(3)), VectorSymbol(Symbol('c'))), VecMul(VecPow(Magnitude(VectorSymbol(Symbol('c'))), Integer(2)), VectorSymbol(Symbol('b'))))"
+    #     assert srepr(sexpr) == dc
+    #     # assert self._check_args(
+    #     #     sexpr,
+    #     #     ((self.one + a) * c.mag) + (Pow(c.mag, 2) * b) + (Pow(c.mag, 3) * c)
+    #     # #     VecAdd(VecMul(VecAdd(self.one, a), c.mag), VecMul(Pow(c.mag, 3), c), VecMul(Pow(c.mag, 2), b))
+    #     # )
 
-        expr = (a + b) * a.mag + (a + b) * b.mag
-        sexpr = collect(expr, a + b)
-        assert self._check_args(
-            sexpr,
-            (a + b) * (a.mag + b.mag)
-        )
+    #     expr = (a + b) * a.mag + (a + b) * b.mag
+    #     sexpr = collect(expr, a + b)
+    #     assert self._check_args(
+    #         sexpr,
+    #         (a + b) * (a.mag + b.mag)
+    #     )
 
-        expr = x * a + y * a + 4 * a
-        sexpr = collect(expr, a)
-        assert self._check_args(
-            sexpr,
-            (x + y + 4) * a
-        )
+    #     expr = x * a + y * a + 4 * a
+    #     sexpr = collect(expr, a)
+    #     assert self._check_args(
+    #         sexpr,
+    #         (x + y + 4) * a
+    #     )
     
     def test_collect_cross_dot(self):
         a, b, c, d, e, f, g, h = self.vector_symbols
@@ -334,76 +337,59 @@ class test_Simplify(u.TestCase, CommonTest):
     def test_expand(self):
         a, b, c, d, e, f, g, h = self.vector_symbols
         x, y, z = self.symbols
-
-        # expand additive terms in cross products
-        expr = a ^ (b + c)
-        assert self._check_args(
-            expr.expand(),
-            (a ^ b) + (a ^ c)
-        )
-
-        expr = a ^ (b ^ (c + self.one))
-        assert self._check_args(
-            expr.expand(),
-            (a ^ (b ^ self.one)) + (a ^ (b ^ c))
-        )
-
-        expr = (a + d) ^ (b ^ c)
-        assert self._check_args(
-            expr.expand(),
-            (a ^ (b ^ c)) + (d ^ (b ^ c))
-        )
-
-        expr = a ^ ((b + c) ^ d)
-        assert self._check_args(
-            expr.expand(),
-            (a ^ (b ^ d)) + (a ^ (c ^ d))
-        )
-
-        # expand additive terms in dot products
-        expr = a & (b + c)
-        assert self._check_args(
-            expr.expand(),
-            (a & b) + (a & c)
-        )
-
-        expr = (a + b) & c
-        assert self._check_args(
-            expr.expand(),
-            (a & c) + (b & c)
-        )
-
-        expr = (a + b) & (c + d)
-        assert self._check_args(
-            expr.expand(),
-            (a & c) + (b & c) + (b & d) + (a & d)
-        )
-
-        expr = a & (b + (c & (d + e) * f.mag) * g)
-        assert self._check_args(
-            expr.expand(),
-            (a & b) + f.mag * (a & g) * (c & d) + f.mag *  (a & g) * (c & e)
-        )
+        nabla = Nabla()
 
         # expand general expressions
         expr = self.one + 2 * (a ^ (b + c))
         assert self._check_args(
-            expr.expand(),
+            expr.expand(cross=False),
+            expr
+        )
+        assert self._check_args(
+            expr.expand(cross=True),
             self.one + 2 * (a ^ b) + 2 * (a ^ c)
+        )
+
+        expr = (x + y) * a + Grad(x + y * z)
+        assert self._check_args(
+            expr.expand(),
+            x * a + y * a + Grad(x + y * z)
+        )
+        assert self._check_args(
+            expr.expand(gradient=True),
+            x * a + y * a + Grad(x) + Grad(y * z)
+        )
+        assert self._check_args(
+            expr.expand(gradient=True, prod=True),
+            x * a + y * a + Grad(x) + y * Grad(z) + z * Grad(y)
         )
 
         expr = self.one + (c ^ ((d + e) ^ f))
         assert self._check_args(
-            expr.expand(),
+            expr.expand(cross=True),
             self.one + (c ^ (d ^ f)) + (c ^ (e ^ f))
         )
 
         expr = x * ((a & (b + (c & (d + e) * f.mag) * g)) + (((a + b) ^ c) & d))
         assert self._check_args(
-            expr.expand(),
+            expr.expand(dot=True, cross=True),
             (x * (a & b) + x * f.mag * (a & g) * (c & d) + 
                 x * f.mag *  (a & g) * (c & e) + x * ((a ^ c) & d) + 
                 x * ((b ^ c) & d))
+        )
+
+        expr = Laplace(a + b) + ((c + d) ^ Grad(x * y))
+        assert self._check_args(
+            expr.expand(cross=True),
+            Laplace(a + b) + (c ^ Grad(x * y)) + (d ^ Grad(x * y))
+        )
+        assert self._check_args(
+            expr.expand(cross=True, laplacian=True),
+            Laplace(a) +  Laplace(b) + (c ^ Grad(x * y)) + (d ^ Grad(x * y))
+        )
+        assert self._check_args(
+            expr.expand(cross=True, laplacian=True, gradient=True, prod=True),
+            Laplace(a) +  Laplace(b) + (x * (c ^ Grad(y))) + (y * (c ^ Grad(x))) + (x * (d ^ Grad(y))) + (y * (d ^ Grad(x)))
         )
 
     def test_simplify(self):
@@ -422,6 +408,8 @@ class test_Simplify(u.TestCase, CommonTest):
             simplify(expr),
             a.mag**2 + b.mag**2 + (a & b)
         )
+
+        
 
         expr = ((a & a) + (b & b) + (a & b)) * x
         assert self._check_args(
@@ -513,7 +501,7 @@ class test_Simplify(u.TestCase, CommonTest):
         )   
     
     def test_identities(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         a, b, c, d, e, f, g, h = self.vector_symbols
         x, y, z = self.symbols
 
@@ -531,7 +519,8 @@ class test_Simplify(u.TestCase, CommonTest):
         expr = (nabla & (x * a)) + 4 * (nabla & (y * a))
         assert self._check_args(
             identities(expr, prod_div=True),
-            (Grad(x) & a) + (x * (nabla & a)) + 4 * (Grad(y) & a) + 4 * (y * (nabla & a))
+            # (Grad(x) & a) + (x * (nabla & a)) + 4 * (Grad(y) & a) + Mul(4, y) * (nabla & a)
+            (Grad(x) & a) + (x * (nabla & a)) + 4 * (Grad(y) & a) + 4 * y * (nabla & a)
         )
 
         # Identity D
@@ -576,14 +565,14 @@ class test_Simplify(u.TestCase, CommonTest):
         )
         assert self._check_args(
             identities(expr, curl_of_cross=True),
-            ((nabla & b) * a) + DotNablaOp(b, a) - ((nabla & a) * b) - DotNablaOp(a, b)
+            ((nabla & b) * a) + Advection(b, a) - ((nabla & a) * b) - Advection(a, b)
         )
 
         expr = (nabla ^ (a ^ b)) + 4 * (nabla ^ (c ^ d))
         assert self._check_args(
             identities(expr, curl_of_cross=True),
-            (((nabla & b) * a) + DotNablaOp(b, a) - ((nabla & a) * b) - DotNablaOp(a, b)
-            + 4 * (((nabla & d) * c) + DotNablaOp(d, c) - ((nabla & c) * d) - DotNablaOp(c, d)))
+            (((nabla & b) * a) + Advection(b, a) - ((nabla & a) * b) - Advection(a, b)
+            + 4 * (((nabla & d) * c) + Advection(d, c) - ((nabla & c) * d) - Advection(c, d)))
         )
 
         # Identity G
@@ -594,14 +583,14 @@ class test_Simplify(u.TestCase, CommonTest):
         )
         assert self._check_args(
             identities(expr, grad_of_dot=True),
-            DotNablaOp(a, b) + DotNablaOp(b, a) + (a ^ (nabla ^ b)) + (b ^ (nabla ^ a))
+            Advection(a, b) + Advection(b, a) + (a ^ (nabla ^ b)) + (b ^ (nabla ^ a))
         )
 
         expr = Grad(a & b) + 4 * Grad(c & d)
         assert self._check_args(
             identities(expr, grad_of_dot=True),
-            (DotNablaOp(a, b) + DotNablaOp(b, a) + (a ^ (nabla ^ b)) + (b ^ (nabla ^ a))
-            + 4 * (DotNablaOp(c, d) + DotNablaOp(d, c) + (c ^ (nabla ^ d)) + (d ^ (nabla ^ c))))
+            (Advection(a, b) + Advection(b, a) + (a ^ (nabla ^ b)) + (b ^ (nabla ^ a))
+            + 4 * (Advection(c, d) + Advection(d, c) + (c ^ (nabla ^ d)) + (d ^ (nabla ^ c))))
         )
 
         # Identity H

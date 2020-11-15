@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import S, Integer, Pow, Symbol
 from sympy.vector import CoordSys3D, Vector, VectorAdd, divergence
 
@@ -18,7 +18,7 @@ class test_VecPow(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         assert VecPow(1, v1.mag) == S.One
         assert isinstance(VecPow(x, 1), Symbol)
@@ -61,7 +61,7 @@ class test_VecPow(u.TestCase, CommonTest):
 
     
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = VecPow(VecDot(vn1, vn2), v1.mag)
         assert isinstance(expr, VecPow)
@@ -69,7 +69,7 @@ class test_VecPow(u.TestCase, CommonTest):
         assert isinstance(expr.doit(), Pow)
     
     def test_is_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert not VecPow(v1.mag, 1).is_Vector
         assert not VecPow(v1.mag, -1).is_Vector

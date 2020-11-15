@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Add, Mul, Symbol, S
 from sympy.vector import CoordSys3D, Vector, VectorZero as VZero
 
@@ -21,7 +21,7 @@ class test_VecMul(u.TestCase, CommonTest):
         assert VecMul.identity == S.One
 
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         # no args
         assert VecMul() == S.One
@@ -53,7 +53,7 @@ class test_VecMul(u.TestCase, CommonTest):
         assert isinstance(VecMul(2, v2, v1.mag), VecMul)
 
     def test_flatten(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         # test sympy.strategies.flatten applied to VecAdd
         assert self._check_args(
@@ -70,7 +70,7 @@ class test_VecMul(u.TestCase, CommonTest):
         )
 
     def test_mul_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         def func(args, **kwargs):
             with self.assertRaises(TypeError) as context:
@@ -87,14 +87,14 @@ class test_VecMul(u.TestCase, CommonTest):
         func([v1, v1 + v2])
     
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         assert isinstance(VecMul(v1.mag, v1.mag, evaluate=False).doit(), VecPow)
         assert isinstance(VecMul(3, VecDot(vn1, vn2)).doit(), Add)
         assert isinstance(VecMul(3, VecDot(vn1, vn2)).doit(deep=False), VecMul)
     
     def test_is_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         # one argument
         assert not VecMul(1).is_Vector
@@ -123,7 +123,7 @@ class test_VecMul(u.TestCase, CommonTest):
         assert not VecMul(3, VecDot(v1, v2), VecDot(VecMul(x, VecCross(v1, v2)), v1)).is_Vector
 
     def test_is_commutative(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         # one argument
         assert VecMul(1).is_commutative

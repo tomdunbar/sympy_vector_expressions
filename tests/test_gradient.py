@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Add
 from sympy.vector import (
     CoordSys3D, Vector, VectorZero as VZero, 
@@ -21,7 +21,7 @@ class test_Grad(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         # gradient of scalar fields
         # TODO: separate scalar fields from constants symbols, numbers, ...
@@ -46,7 +46,7 @@ class test_Grad(u.TestCase, CommonTest):
             Grad(nabla)
         
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         v = C.x * C.y * C.z
         assert gradient(v) == Grad(v).doit()
@@ -56,37 +56,76 @@ class test_Grad(u.TestCase, CommonTest):
         assert isinstance(Grad(expr).doit(), Vector)
     
     def test_expand(self):
-        assert Grad(x).expand() == Grad(x)
+        x, y, z = self.symbols
+        assert Grad(x).expand(gradient=True) == Grad(x)
+
+        expr = Grad(x + y)
         assert self._check_args(
-            Grad(x + y).expand(),
+            expr.expand(gradient=False),
+            expr
+        )
+        assert self._check_args(
+            expr.expand(gradient=True),
             Grad(x) + Grad(y)
         )
         assert self._check_args(
-            Grad(x * y).expand(),
-            Grad(x * y)
+            expr.expand(gradient=True, prod=True),
+            Grad(x) + Grad(y)
+        )
+
+        expr = Grad(x * y)
+        assert self._check_args(
+            expr.expand(gradient=False),
+            expr
         )
         assert self._check_args(
-            Grad(x * y).expand(prod=True),
+            expr.expand(gradient=True),
+            expr
+        )
+        assert self._check_args(
+            expr.expand(gradient=True, prod=True),
             y * Grad(x) + x * Grad(y)
         )
+
+        expr = Grad(x * y * z)
         assert self._check_args(
-            Grad(x * y * z).expand(prod=True),
+            expr.expand(gradient=False),
+            expr
+        )
+        assert self._check_args(
+            expr.expand(gradient=True),
+            expr
+        )
+        assert self._check_args(
+            expr.expand(gradient=True, prod=True),
             z * y * Grad(x) + x * z * Grad(y) + y * x * Grad(z)
         )
+
+        expr = Grad(x * y + z)
         assert self._check_args(
-            Grad(x * y + z).expand(),
-            Grad(z) + Grad(x * y)
+            expr.expand(gradient=False),
+            expr
         )
         assert self._check_args(
-            Grad(x * y + z).expand(prod=True),
+            expr.expand(gradient=True),
+            Grad(z) + Grad(x * y) 
+        )
+        assert self._check_args(
+            expr.expand(gradient=True, prod=True),
             Grad(z) + y * Grad(x) + x * Grad(y)
         )
+
+        expr = Grad(x / y)
         assert self._check_args(
-            Grad(x / y).expand(),
-            Grad(x / y)
+            expr.expand(gradient=False),
+            expr
         )
         assert self._check_args(
-            Grad(x / y).expand(quotient=True),
+            expr.expand(gradient=True),
+            expr
+        )
+        assert self._check_args(
+            expr.expand(gradient=True, quotient=True),
             (y * Grad(x) - x * Grad(y)) / y**2
         )
 

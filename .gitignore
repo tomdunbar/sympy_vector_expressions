@@ -3,6 +3,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Every file whose name start with
+Untitled*
+
+# other files and folders
+tempCodeRunnerFile.py
+*.ps
+*.png
+.ipynb_checkpoints
+
 # C extensions
 *.so
 

@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Symbol, S
 from sympy.vector import CoordSys3D, Vector, VectorZero as VZero
 
@@ -18,22 +18,22 @@ class test_VectorSymbol(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
-        assert VectorSymbol("v1")
-        assert VectorSymbol(Symbol("x"))
-        assert VectorSymbol(v1)
+        assert isinstance(VectorSymbol("v1"), VectorSymbol)
+        assert isinstance(VectorSymbol(Symbol("x")), VectorSymbol)
+        assert VectorSymbol(v1) == v1
 
         def func(s):
-            with self.assertRaises(TypeError) as context:
+            with self.assertRaises(TypeError):
                 VectorSymbol(s)
-            self.assertTrue("'name' must be a string or a Symbol or a VectorSymbol" in str(context.exception))
-        
+
+        func(x + y)
         func(VecAdd(v1, v2))
         func(Symbol("x") + Symbol("y"))
     
     def test_attributes(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert hasattr(v1, "_vec_symbol")
         assert hasattr(v1, "_unit_vec_symbol")
@@ -41,7 +41,7 @@ class test_VectorSymbol(u.TestCase, CommonTest):
         assert hasattr(v1, "_italic")
     
     def test_is_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert v1.is_Vector
         assert v2.is_Vector
@@ -50,7 +50,7 @@ class test_VectorSymbol(u.TestCase, CommonTest):
         assert nabla.is_Vector
     
     def test_zero_one_nabla(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         # magnitudes
         assert zero.mag == S.Zero
@@ -65,14 +65,14 @@ class test_VectorSymbol(u.TestCase, CommonTest):
             nabla.norm
     
     def test_instances(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert isinstance(zero, VectorSymbol)
         assert isinstance(one, VectorSymbol)
         assert isinstance(nabla, VectorSymbol)
     
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert v1.doit() == v1
         assert one.doit() == one

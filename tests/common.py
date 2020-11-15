@@ -10,10 +10,9 @@ from vector_expr import (
     VectorSymbol, VectorZero, VectorOne, Nabla
 )
 
-x, y, z = symbols("x:z")
-
 class CommonTest:
     def setUp(self):
+        self.x, self.y, self.z = symbols("x:z")
         self.v1 = VectorSymbol("v1")
         self.v2 = VectorSymbol("v2")
         self.zero = VectorZero()
@@ -22,11 +21,15 @@ class CommonTest:
         C = CoordSys3D("C")
         self.C = C
         self.vn1 = C.i + 2 * C.j + 3 * C.k
-        self.vn2 = x * C.i + y * C.j + z * C.k
+        self.vn2 = self.x * C.i + self.y * C.j + self.z * C.k
+
+        self.vector_symbols = [VectorSymbol(t) for t in 
+            ["a", "b", "c", "d", "e", "f", "g", "h"]]
+        self.symbols = [self.x, self.y, self.z]
     
     def _get_vars(self):
-        return [self.v1, self.v2, self.zero, self.one,
-            self.nabla, self.C, self.vn1, self.vn2]
+        return [self.v1, self.v2, self.zero, self.one, self.nabla, 
+            self.C, self.vn1, self.vn2, self.x, self.y, self.z]
     
     def _check_args(self, expr1, expr2):
         """Return True if the arguments of expr1 are the same

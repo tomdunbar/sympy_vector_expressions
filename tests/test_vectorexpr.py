@@ -50,6 +50,13 @@ class test_VectorExpr(u.TestCase, CommonTest):
         _func(expr.args[0].args[0])
         _func(expr.args[1].args[1].args[1])
 
+    def test_equals(self):
+        a, b, c, d, e, f, g = [VectorSymbol(t) for t in 
+            ["a", "b", "c", "d", "e", "f", "g"]]
+        x, y, z = symbols("x:z")
+
+        assert (a + b) == (a + b)
+        assert not ((a + b) == (a + b * 2))
         
 
 if __name__ == "__main__":

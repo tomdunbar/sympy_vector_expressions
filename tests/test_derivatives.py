@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import S, Integer
 from sympy.vector import CoordSys3D, Vector, VectorAdd, divergence
 
@@ -18,7 +18,7 @@ class test_Derivatives(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_vector_symbols(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert isinstance(v1.diff(x), D)
         assert isinstance(v1.diff(x, 2), D)
@@ -29,16 +29,16 @@ class test_Derivatives(u.TestCase, CommonTest):
         with self.assertRaises(NotImplementedError) as context:
             nabla.diff(x)
         
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            v1.diff(x, y)
-        with self.assertRaises(NotImplementedError) as context:
-            one.diff(x, y)
-        with self.assertRaises(NotImplementedError) as context:
-            zero.diff(x, y)
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     v1.diff(x, y)
+        # with self.assertRaises(NotImplementedError) as context:
+        #     one.diff(x, y)
+        # with self.assertRaises(NotImplementedError) as context:
+        #     zero.diff(x, y)
 
     def test_magnitude(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = v1.mag
         assert isinstance(expr.diff(x), D)
@@ -48,12 +48,12 @@ class test_Derivatives(u.TestCase, CommonTest):
         assert isinstance(one.diff(x, evaluate=False), D)
         assert one.diff(x) == VectorZero()
 
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            v1.mag.diff(x, y)
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     v1.mag.diff(x, y)
 
     def test_vecadd(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = v1 + v2
         dexpr = expr.diff(x)
@@ -70,12 +70,12 @@ class test_Derivatives(u.TestCase, CommonTest):
         assert isinstance(dexpr, D)
         assert dexpr.args[0].variable_count[0][1] == 3
 
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            expr.diff(x, y)
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     expr.diff(x, y)
     
     def test_vecmul(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = 2 * v1
         dexpr = expr.diff(x)
@@ -98,12 +98,12 @@ class test_Derivatives(u.TestCase, CommonTest):
             v2 * v1.mag.diff(x) + v1.mag * v2.diff(x)
         )
 
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            expr.diff(x, y)
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     expr.diff(x, y)
     
     def test_vecpow(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = VecPow(v1.mag, 3)
         assert isinstance(expr.diff(x), VecMul)
@@ -117,27 +117,26 @@ class test_Derivatives(u.TestCase, CommonTest):
             VecMul(-1, VecPow(VecPow(v1.mag, -1), 2), v1.mag.diff(x))
         )
         assert not dexpr.is_Vector
-        assert dexpr.is_Vector_Scalar
 
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            expr.diff(x, y)
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     expr.diff(x, y)
 
     def test_normalize(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert isinstance(v1.norm.diff(x), D)
         assert isinstance(v1.norm.doit().diff(x, evaluate=False), D)
         assert isinstance(v1.norm.doit().diff(x), VecAdd)
         
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            v1.norm.diff(x, y)
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     v1.norm.diff(x, y)
 
         # TODO: v1.norm.diff(x).doit() produces wrong result
 
     def test_vecdot(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert isinstance(VecDot(v1, v2).diff(x), VecAdd)
         assert isinstance(VecDot(v1, v2).diff(x, evaluate=False), D)
@@ -145,12 +144,15 @@ class test_Derivatives(u.TestCase, CommonTest):
         expr = VecDot(v1, v2).diff(x, 2)
         assert isinstance(expr, VecAdd) and len(expr.args) == 3
 
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            VecDot(v1, v2).diff(x, y)
+        expr = v1.div.diff(x, 2)
+        assert isinstance(expr, D)
+
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     VecDot(v1, v2).diff(x, y)
     
     def test_veccross(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = VecCross(v1, v2)
         assert isinstance(expr.diff(x), VecAdd)
@@ -160,12 +162,15 @@ class test_Derivatives(u.TestCase, CommonTest):
             (v1.diff(x) ^ v2) + (v1 ^ v2.diff(x))
         )
 
-        # partial differentiation not implemented
-        with self.assertRaises(NotImplementedError) as context:
-            VecCross(v1, v2).diff(x, y)
+        expr = v1.cu.diff(x, 2)
+        assert isinstance(expr, D)
+
+        # # partial differentiation not implemented
+        # with self.assertRaises(NotImplementedError) as context:
+        #     VecCross(v1, v2).diff(x, y)
         
     def test_d(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = v1.diff(x)
         assert expr.diff(x, 3).args[0].variable_count[0][1] == 4

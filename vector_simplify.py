@@ -1,13 +1,16 @@
 from itertools import combinations
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from sympy import (
-    S, Mul, Add, Abs, preorder_traversal, collect_const, Wild
+    S, Mul, Add, Abs, preorder_traversal, Wild, 
+    Symbol, postorder_traversal, sympify
 )
+from sympy.core.exprtools import Factors
+from sympy.vector import Vector
 from sympy.utilities.iterables import ordered
 from vector_expr import (
     VectorExpr, VecAdd, VecMul, VecPow, VecDot, VecCross, 
     Magnitude, Normalize, WVS, VectorSymbol, VectorOne, DotCross,
-    Grad, Laplace, VectorZero, Nabla, DotNablaOp
+    Grad, Laplace, VectorZero, Nabla, Advection, _sanitize_args
 )
 
 # TODO: 
@@ -15,10 +18,90 @@ from vector_expr import (
 # 2. expr = a.mag * (a ^ b) + a.mag * (a ^ c)
 #    simplify(expr)
 #    a.mag * (a ^ (b + c))
-# 3. Fix Del Operator:
-#       https://en.wikipedia.org/wiki/Del
-# 4. Vector Identities
-#       https://en.wikipedia.org/wiki/Vector_calculus_identities
+# 3. bac-cab into identities
+
+def collect_const(expr, *vars, **kwargs):
+    """ This is the very same code of sympy.simplify.radsimp.py collect_const,
+    with modification: the original method used Mul._from_args
+    and Add._from_args, which do not call a post-processor, hence I obtained the
+    wrong result. Here, I use VecAdd, VecMul...
+    """
+    if not expr.is_Add:
+        return expr
+
+    recurse = False
+    Numbers = kwargs.get('Numbers', True)
+
+    if not vars:
+        recurse = True
+        vars = set()
+        for a in expr.args:
+            for m in Mul.make_args(a):
+                if m.is_number:
+                    vars.add(m)
+    else:
+        vars = sympify(vars)
+    if not Numbers:
+        vars = [v for v in vars if not v.is_Number]
+    
+    vars = list(ordered(vars))
+    for v in vars:
+        terms = defaultdict(list)
+        Fv = Factors(v)
+        for m in Add.make_args(expr):
+            f = Factors(m)
+            q, r = f.div(Fv)
+            if r.is_one:
+                # only accept this as a true factor if
+                # it didn't change an exponent from an Integer
+                # to a non-Integer, e.g. 2/sqrt(2) -> sqrt(2)
+                # -- we aren't looking for this sort of change
+                fwas = f.factors.copy()
+                fnow = q.factors
+                if not any(k in fwas and fwas[k].is_Integer and not
+                        fnow[k].is_Integer for k in fnow):
+                    terms[v].append(q.as_expr())
+                    continue
+            terms[S.One].append(m)
+
+        args = []
+        hit = False
+        uneval = False
+        for k in ordered(terms):
+            v = terms[k]            
+            if k is S.One:
+                args.extend(v)
+                continue
+
+            if len(v) > 1:
+                v = Add(*v)
+                hit = True
+                if recurse and v != expr:
+                    vars.append(v)
+            else:
+                v = v[0]
+
+            # be careful not to let uneval become True unless
+            # it must be because it's going to be more expensive
+            # to rebuild the expression as an unevaluated one
+            if Numbers and k.is_Number and v.is_Add:
+                # args.append(_keep_coeff(k, v, sign=True))
+                args.append(VecMul(*[k, v], evaluate=False))
+                uneval = True
+            else:
+                args.append(k*v)
+
+        if hit:
+            if uneval:
+                # expr = Add(*args)
+                expr = VecAdd(*args, evaluate=False)
+            else:
+                # expr = Add(*args)
+                expr = VecAdd(*args)
+            if not expr.is_Add:
+                break
+
+    return expr
 
 def _find_and_replace(expr, pattern, rep, matches=None):
     """ Given an expression, a search `pattern` and a replacement 
@@ -116,8 +199,10 @@ def find_bac_cab(expr):
     bottom to top).
     """
     def _check_pairs(terms):
-        c1 = Mul(*[a for a in terms[0].args if not hasattr(a, "is_Vector_Scalar")])
-        c2 = Mul(*[a for a in terms[1].args if not hasattr(a, "is_Vector_Scalar")])
+        # c1 = Mul(*[a for a in terms[0].args if not hasattr(a, "is_Vector_Scalar")])
+        # c2 = Mul(*[a for a in terms[1].args if not hasattr(a, "is_Vector_Scalar")])
+        c1 = Mul(*[a for a in terms[0].args if not isinstance(a, (Vector, VectorExpr))])
+        c2 = Mul(*[a for a in terms[1].args if not isinstance(a, (Vector, VectorExpr))])
         n1, _ = c1.as_coeff_mul()
         n2, _ = c2.as_coeff_mul()
         if n1 * n2 > 0:
@@ -125,8 +210,10 @@ def find_bac_cab(expr):
             return False
         if Abs(c1) != Abs(c2):
             return False
-        v1 = [a for a in terms[0].args if (hasattr(a, "is_Vector_Scalar") and a.is_Vector)][0]
-        v2 = [a for a in terms[1].args if (hasattr(a, "is_Vector_Scalar") and a.is_Vector)][0]
+        # v1 = [a for a in terms[0].args if (hasattr(a, "is_Vector_Scalar") and a.is_Vector)][0]
+        # v2 = [a for a in terms[1].args if (hasattr(a, "is_Vector_Scalar") and a.is_Vector)][0]
+        v1 = [a for a in terms[0].args if (isinstance(a, (Vector, VectorExpr)) and a.is_Vector)][0]
+        v2 = [a for a in terms[1].args if (isinstance(a, (Vector, VectorExpr)) and a.is_Vector)][0]
         if v1 == v2:
             return False
         dot1 = [a for a in terms[0].args if isinstance(a, VecDot)][0]
@@ -148,12 +235,19 @@ def find_bac_cab(expr):
     found = set()
     for arg in preorder_traversal(expr):
         possible_args = list(filter(_check, arg.args))
-        # possible_args = list(arg.find(A * (B & C)))
-        # possible_args = list(filter(lambda x: isinstance(x, VecMul), possible_args))
+        # print("possible_args", possible_args)
+        # for p in possible_args:
+        #     print("\t", p.func, p.is_Vector, p)
+        # # possible_args = list(arg.find(A * (B & C)))
+        # # possible_args = list(filter(lambda x: isinstance(x, VecMul), possible_args))
         if len(possible_args) > 1:
             combs = list(combinations(possible_args, 2))
+            # print("COMBINATIONS", combs)
             for c in combs:
+                # print("\tC", c)
+                # print("\n\t\t".join(str(a.func) + ", " + str(a.is_Vector) + ", " + str(a) for a in c))
                 if _check_pairs(c):
+                    # print("\t\t proceeding")
                     found.add(VecAdd(*c))
     found = list(ordered(list(found)))
     return found
@@ -171,8 +265,10 @@ def bac_cab_backward(expr, matches=None):
     def _get_abc(match):
         terms = match.args
         # at this point, c1 and c2 should be equal in magnitude
-        c1 = Mul(*[a for a in terms[0].args if not hasattr(a, "is_Vector_Scalar")])
-        c2 = Mul(*[a for a in terms[1].args if not hasattr(a, "is_Vector_Scalar")])
+        # c1 = Mul(*[a for a in terms[0].args if not hasattr(a, "is_Vector_Scalar")])
+        # c2 = Mul(*[a for a in terms[1].args if not hasattr(a, "is_Vector_Scalar")])
+        c1 = Mul(*[a for a in terms[0].args if not isinstance(a, (Vector, VectorExpr))])
+        c2 = Mul(*[a for a in terms[1].args if not isinstance(a, (Vector, VectorExpr))])
         n1, _ = c1.as_coeff_mul()
         n2, _ = c2.as_coeff_mul()
         dot1 = [a for a in terms[0].args if isinstance(a, VecDot)][0]
@@ -273,17 +369,21 @@ def collect(expr, match):
     return VecAdd(VecMul(match, VecAdd(*collect)), *not_collect)
 
 def _as_coeff_vector(v):
-    """ Similarly to as_coeff_mul(), it extract the multiplier coefficients from
+    """ Similarly to as_coeff_mul(), it extract the multiplier coefficients
     and the vector part from the VectorExpr.
     """
+    print("DIOCANE", v.func, v)
     if isinstance(v, (VectorSymbol, Magnitude, Normalize)):
         return 1, v
     if isinstance(v, VecAdd):
         # TODO: implement more sofisticated technique to collect common
         # symbols from vector quantities
         v = collect_const(v)
+        print("\tafter collect_const", v.func, v)
         k, mul = v.as_coeff_mul()
+        print("\tafter as_coeff_mul", k, mul)
         v = mul[0]
+        print("\t\t", v.func, v)
         return k, v
     if isinstance(v, VecMul):
         k = [a for a in v.args if not a.is_Vector]
@@ -304,6 +404,9 @@ def _as_coeff_product(expr):
         return expr
     k1, a = _as_coeff_vector(expr.args[0])
     k2, b = _as_coeff_vector(expr.args[1])
+    print("_as_coeff_product")
+    print("\t", k1, a.func, a)
+    print("\t", k2, b.func, b)
     return (k1 * k2) * expr.func(a, b)
 
 def _collect_coeff_from_product(expr, pattern):
@@ -315,7 +418,7 @@ def _collect_coeff_from_product(expr, pattern):
         newf = _as_coeff_product(f)
         for j in range(i + 1, len(found)):
             found[j] = found[j].xreplace({f: newf})
-        expr = expr.xreplace({f: newf})
+        expr = expr.subs({f: newf})
     return expr
 
 def _terms_with_commong_args(args_list, first_arg=True):
@@ -464,10 +567,10 @@ def simplify(expr, **kwargs):
     
     A, B, C = [WVS(t) for t in ["A", "B", "C"]]   
 
-    # Identity H: nabla ^ (Grad(x)) = 0
-    expr = _curl_of_grad(expr)
-    # Identity I: nabla & (nabla ^ a) = 0
-    expr = _div_of_curl(expr)
+    # # Identity H: nabla ^ (Grad(x)) = 0
+    # expr = _curl_of_grad(expr)
+    # # Identity I: nabla & (nabla ^ a) = 0
+    # expr = _div_of_curl(expr)
 
     ############################################################################
     ###################### RULE 0: Identities H and I ##########################
@@ -515,6 +618,9 @@ def simplify(expr, **kwargs):
         expr = collect_cross_dot(expr)
         expr = collect_cross_dot(expr, VecCross, False)
 
+    ############################################################################
+    ###################### RULE 1: (v & v) = v.mag**2 ##########################
+    ############################################################################
     # Repeat Rule #1 just in case other simplifications created new occurences
     if dot_to_mag:
         expr = _dot_to_mag(expr)
@@ -524,9 +630,20 @@ def simplify(expr, **kwargs):
 w = Wild("w")
 wa = WVS("w_a")
 wb = WVS("w_b")
+wc = WVS("w_c")
 nabla = Nabla()
 
 _id = {
+    # A x (B x C) = B (A . C) - C (A . B)
+    "abc": [
+        wa ^ (wb ^ wc),
+        (wb * (wa & wc)) - (wc * (wa & wb))
+    ],
+    # # B (A . C) - C (A . B) = A x (B x C)
+    # "bac_cab": [
+    #     (wb * (wa & wc)) - (wc * (wa & wb)),
+    #     wa ^ (wb ^ wc)
+    # ],
     # Identity C
     "prod_div": [
         nabla & (w * wa),
@@ -545,12 +662,12 @@ _id = {
     # Identity F
     "curl_of_cross": [
         nabla ^ (wa ^ wb),
-        ((nabla & wb) * wa) + DotNablaOp(wb, wa) - ((nabla & wa) * wb) - DotNablaOp(wa, wb)
+        ((nabla & wb) * wa) + Advection(wb, wa) - ((nabla & wa) * wb) - Advection(wa, wb)
     ],
     # Identity G
     "grad_of_dot": [
         Grad(wa & wb),
-        DotNablaOp(wa, wb) + DotNablaOp(wb, wa) + (wa ^ (nabla ^ wb)) + (wb ^ (nabla ^ wa))
+        Advection(wa, wb) + Advection(wb, wa) + (wa ^ (nabla ^ wb)) + (wb ^ (nabla ^ wa))
     ],
     # Identity H
     "curl_of_grad": [
@@ -587,10 +704,10 @@ def identities(expr, **hints):
             nabla & (wa ^ wb) = ((nabla ^ wa) & wb) - ((nabla ^ wb) & wa)
         
         curl_of_cross = True
-            nabla ^ (wa ^ wb) = ((nabla & wb) * wa) + DotNablaOp(wb, wa) - ((nabla & wa) * wb) - DotNablaOp(wa, wb)
+            nabla ^ (wa ^ wb) = ((nabla & wb) * wa) + Advection(wb, wa) - ((nabla & wa) * wb) - Advection(wa, wb)
         
         grad_of_dot = True
-            Grad(wa & wb) = DotNablaOp(wa, wb) + DotNablaOp(wb, wa) + (wa ^ (nabla ^ wb)) + (wb ^ (nabla ^ wa))
+            Grad(wa & wb) = Advection(wa, wb) + Advection(wb, wa) + (wa ^ (nabla ^ wb)) + (wb ^ (nabla ^ wa))
         
         curl_of_grad = True
             nabla ^ Grad(w) = VectorZero()
@@ -601,19 +718,42 @@ def identities(expr, **hints):
         curl_of_curl = True
             nabla ^ (nabla ^ wa) = Grad(nabla & wa) - Laplace(wa)
     """
+    
+    bac_cab = hints.get('bac_cab', False)
+
+    if bac_cab:
+        expr = bac_cab_backward(expr)
 
     for hint, val in hints.items():
         if hint in _id.keys() and (val == True):
             pattern, subs = _id[hint]
             found = list(ordered(list(expr.find(pattern))))
+            print("found list", found)
             for i, f in enumerate(found):
-                fsubs = subs.xreplace(f.match(pattern))
-                # update found list
-                for j in range(i + 1, len(found)):
-                    found[j] = found[j].subs(f, fsubs)
-                expr = expr.subs(f, fsubs)
+                # proceed only if there is a match
+                # Say we are in the previous iteration, i. Then we substitute
+                # the previous match into found[i+1]. Now we are into iteration
+                # i+1, but because we substituted a previous result into it, it
+                # might not be "a pattern" anymore. Need to check it!
+                m = f.match(pattern)
+                print("\tf", f, m)
+                if m:
+                    fsubs = subs.xreplace(m)
+                    # update found list
+                    for j in range(i + 1, len(found)):
+                        found[j] = found[j].subs(f, fsubs)
+                    expr = expr.subs(f, fsubs)
     return expr
 
 # TODO:
 # 1. Nested identities "prod_div" and "prod_curl" don't work.
 # 
+
+if __name__ == "__main__":
+    a = VectorSymbol("a")
+    b = VectorSymbol("b")
+    x = Symbol("x")
+    y = Symbol("y")
+    nabla = Nabla()
+    expr = (nabla & (x * a)) + 4 * (nabla & (y * a))
+    r = identities(expr, prod_div=True)

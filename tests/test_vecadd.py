@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Add, Mul, S, srepr
 from sympy.vector import CoordSys3D, Vector, VectorZero as VZero
 
@@ -25,7 +25,7 @@ class test_VecAdd(u.TestCase, CommonTest):
         assert VecAdd.identity == S.Zero
 
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         # no args
         assert VecAdd() == VectorZero()
@@ -50,9 +50,11 @@ class test_VecAdd(u.TestCase, CommonTest):
         assert isinstance(VecAdd(one, v2 ^ v1), VecAdd)
         assert isinstance(VecAdd(1, v2 & v1), VecAdd)
         assert isinstance(VecAdd(one, v1, v2), VecAdd)
+        assert isinstance(VecAdd(v1, v1), VecMul)
+        assert isinstance(VecAdd(v1, v1, evaluate=False), VecAdd)
 
     def test_mix_scalar_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         def func(args, **kwargs):
             with self.assertRaises(TypeError) as context:
@@ -63,15 +65,13 @@ class test_VecAdd(u.TestCase, CommonTest):
         func([v1.mag, one])
         func([vn1, 1])
         func([vn1.magnitude(), one])
-        func([v1, 0], evaluate=False)
-        func([v1.mag, zero], evaluate=False)
         func([v1 & v2, one])
         func([v1 & v2, one], evaluate=False)
         func([v1 ^ v2, 1])
         func([v1 ^ v2, 1], evaluate=False)
 
     def test_flatten(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         # test sympy.strategies.flatten applied to VecAdd
         assert self._check_args(
@@ -92,7 +92,7 @@ class test_VecAdd(u.TestCase, CommonTest):
         )
 
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
 
         expr = VecAdd(v1, v2, v1, evaluate=False)
         assert not self._check_args(
@@ -138,22 +138,22 @@ class test_VecAdd(u.TestCase, CommonTest):
         )
 
     def test_is_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert VecAdd(v1, v2).is_Vector
-        assert not VecAdd(v1, v2).is_Vector_Scalar
+        # assert not VecAdd(v1, v2).is_Vector_Scalar
         assert not VecAdd(v1.mag, v2.mag).is_Vector
-        assert VecAdd(v1.mag, v2.mag).is_Vector_Scalar
+        # assert VecAdd(v1.mag, v2.mag).is_Vector_Scalar
         # with dot product and nested mul/dot
         assert not VecAdd(2, v2 & v1).is_Vector
-        assert VecAdd(2, v2 & v1).is_Vector_Scalar
+        # assert VecAdd(2, v2 & v1).is_Vector_Scalar
         assert not VecAdd(2, VecMul(x, v2 & v1)).is_Vector
-        assert VecAdd(2,  VecMul(x, v2 & v1)).is_Vector_Scalar
+        # assert VecAdd(2,  VecMul(x, v2 & v1)).is_Vector_Scalar
         # with cross product and nested mul/cross
         assert VecAdd(v1, v2 ^ v1).is_Vector
-        assert not VecAdd(v1, v2 ^ v1).is_Vector_Scalar
+        # assert not VecAdd(v1, v2 ^ v1).is_Vector_Scalar
         assert VecAdd(v1, VecMul(x, v2 ^ v1)).is_Vector
-        assert not VecAdd(v1, VecMul(x, v2 ^ v1)).is_Vector_Scalar
+        # assert not VecAdd(v1, VecMul(x, v2 ^ v1)).is_Vector_Scalar
 
 if __name__ == "__main__":
     u.main()
