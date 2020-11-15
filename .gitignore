@@ -11,6 +11,7 @@ tempCodeRunnerFile.py
 *.ps
 *.png
 .ipynb_checkpoints
+.directory
 
 # C extensions
 *.so
