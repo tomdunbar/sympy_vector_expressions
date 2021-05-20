@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import S, Integer, Number
 from sympy.vector import CoordSys3D, Vector, VectorAdd, divergence
 
@@ -18,7 +18,7 @@ class test_VecDot(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert isinstance(D(2), Number)
         assert isinstance(D(v1), VectorSymbol)
@@ -34,7 +34,7 @@ class test_VecDot(u.TestCase, CommonTest):
         assert isinstance((v1 ^ v2).diff(x, evaluate=False), D)
     
     def test_is_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert (v1 + v2).diff(x, evaluate=False).is_Vector
         assert not (v1 + v2).diff(x, evaluate=False).is_Vector_Scalar

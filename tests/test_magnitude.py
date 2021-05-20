@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Abs, Pow, sqrt, Number, S
 from sympy.vector import CoordSys3D, Vector
 
@@ -18,7 +18,7 @@ class test_Magnitude(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert isinstance(Magnitude(v1), Magnitude)
         assert isinstance(Magnitude(v1.mag), Magnitude)
@@ -30,7 +30,7 @@ class test_Magnitude(u.TestCase, CommonTest):
         assert isinstance(Magnitude(vn1.dot(vn2)), Abs)
 
     def test_vectorsymbol_magnitudes(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert zero.mag == S.Zero
 
@@ -42,7 +42,7 @@ class test_Magnitude(u.TestCase, CommonTest):
         assert isinstance(one.mag, Magnitude)
     
     def test_is_vector(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert not v1.mag.is_Vector
         assert not one.mag.is_Vector
@@ -52,7 +52,7 @@ class test_Magnitude(u.TestCase, CommonTest):
     
 
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert Magnitude(VecAdd(v1, zero, evaluate=False)).doit() == v1.mag
         assert Magnitude(vn1).doit() == sqrt(14)

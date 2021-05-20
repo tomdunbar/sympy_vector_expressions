@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy import Add, Mul, S, srepr, symbols
 from sympy.vector import CoordSys3D, Vector, VectorZero as VZero
 
