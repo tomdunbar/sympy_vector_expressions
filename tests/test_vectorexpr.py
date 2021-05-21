@@ -32,7 +32,7 @@ class test_VectorExpr(u.TestCase, CommonTest):
 
         def _func(expr, expected_is_Vector=True):
             assert expr.is_Vector == expected_is_Vector
-            assert expr.is_Vector_Scalar == (not expected_is_Vector)
+            assert expr.is_scalar == (not expected_is_Vector)
 
         def _assert(expr, expected_is_Vector=True):
             _func(expr)
