@@ -13,7 +13,7 @@ from vector_expr import (
     VecDot, VecCross, Normalize, Magnitude, D
 )
 
-class test_VecDot(u.TestCase, CommonTest):
+class test_Dclass(u.TestCase, CommonTest):
     def setUp(self):
         CommonTest.setUp(self)
     
@@ -37,13 +37,13 @@ class test_VecDot(u.TestCase, CommonTest):
         v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert (v1 + v2).diff(x, evaluate=False).is_Vector
-        assert not (v1 + v2).diff(x, evaluate=False).is_Vector_Scalar
+        assert not (v1 + v2).diff(x, evaluate=False).is_scalar
         assert (v1.mag * v2).diff(x, evaluate=False).is_Vector
-        assert not (v1.mag * v2).diff(x, evaluate=False).is_Vector_Scalar
+        assert not (v1.mag * v2).diff(x, evaluate=False).is_scalar
         assert not (v1 & v2).diff(x, evaluate=False).is_Vector
-        assert (v1 & v2).diff(x, evaluate=False).is_Vector_Scalar
+        assert (v1 & v2).diff(x, evaluate=False).is_scalar
         assert (v1 ^ v2).diff(x, evaluate=False).is_Vector
-        assert not (v1 ^ v2).diff(x, evaluate=False).is_Vector_Scalar
+        assert not (v1 ^ v2).diff(x, evaluate=False).is_scalar
     
 
 if __name__ == "__main__":
