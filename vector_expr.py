@@ -543,6 +543,8 @@ class DotCross(VectorExpr):
 class VecDot(DotCross):
     """ Symbolic representation of the dot product between two symbolic vectors.
     """
+    is_Vector = False    #TD 5/30/21  Added these two lines to pass test_d tests
+    is_scalar = True     #TD 5/30/21
     is_Dot = True
     
     def __new__(cls, expr1, expr2, **kwargs):
