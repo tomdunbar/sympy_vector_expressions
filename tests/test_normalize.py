@@ -1,5 +1,5 @@
 import unittest as u
-from common import CommonTest, x, y, z
+from common import CommonTest
 from sympy.vector import CoordSys3D, Vector
 
 import os,sys,inspect
@@ -17,7 +17,7 @@ class test_Normalize(u.TestCase, CommonTest):
         CommonTest.setUp(self)
     
     def test_creation(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         assert isinstance(Normalize(v1), Normalize)
         assert isinstance(Normalize(one), Normalize)
@@ -38,7 +38,7 @@ class test_Normalize(u.TestCase, CommonTest):
         assert isinstance(Normalize(v1.norm), Normalize)
     
     def test_doit(self):
-        v1, v2, zero, one, nabla, C, vn1, vn2 = self._get_vars()
+        v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         # return a VecMul object (a fraction, vector/magnitude)
         assert isinstance(Normalize(v1).doit(), VecMul)
