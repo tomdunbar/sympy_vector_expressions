@@ -112,7 +112,7 @@ class VectorExpr(Expr):
         return VecCross(self, other)
 
     def diff(self, *symbols, **assumptions):
-        assumptions.setdefault("evaluate", True)
+        assumptions.setdefault("evaluate", False)            #TD 5/30/21  Changed to False
         return D(Derivative(self, *symbols, **assumptions))
 
     def normalize(self, **kwargs):
