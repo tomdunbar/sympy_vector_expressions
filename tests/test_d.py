@@ -27,7 +27,7 @@ class test_Dclass(u.TestCase, CommonTest):
         assert isinstance(D(v1 & v2), VecDot)
         assert isinstance(D(v1 ^ v2), VecCross)
         
-        assert isinstance(D(v1.diff(x)), D)
+        assert isinstance(D(v1.diff(x, evaluate=False)), D)
         assert isinstance((v1 + v2).diff(x, evaluate=False), D)
         assert isinstance((v1.mag * v2).diff(x, evaluate=False), D)
         assert isinstance((v1 & v2).diff(x, evaluate=False), D)

@@ -173,7 +173,7 @@ class test_Derivatives(u.TestCase, CommonTest):
         v1, v2, zero, one, nabla, C, vn1, vn2, x, y, z = self._get_vars()
         
         expr = v1.diff(x)
-        assert expr.diff(x, 3).args[0].variable_count[0][1] == 4
+        assert expr.diff(x, 3).args[0].variable_count[0][1] == 4   #the 3rd derivative wrt x of dv1/dx should be the 4th derivative 
         expr = (v1 + v2).diff(x, 2, evaluate=False)
         assert expr.diff(x, 3).args[0].variable_count[0][1] == 5
 
