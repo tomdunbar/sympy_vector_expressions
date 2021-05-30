@@ -434,6 +434,7 @@ class D(VectorExpr):
         
         obj = Basic.__new__(cls, d)
         obj.is_Vector = d.expr.is_Vector
+        obj.is_scalar = d.expr.is_scalar  #TD 5/30/21
         return obj
     
     def _eval_derivative(self, s):
