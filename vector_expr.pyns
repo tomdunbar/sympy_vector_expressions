@@ -1,0 +1,47 @@
+# PynSource Version 1.2
+{'type':'meta', 'info1':'Lorem ipsum dolor sit amet, consectetur adipiscing elit is latin. Comments are saved.'}
+{'type':'umlshape', 'id':'VectorExpr', 'x':608, 'y':179, 'width':122, 'height':682, 'attrs': '__rtruediv__|__truediv__|_op_priority|cu|div|grad|is_Vector|is_VectorExpr|is_commutative|is_number|is_scalar|is_symbol|lap|mag|norm', 'meths': '__add__|__and__|__div__|__mul__|__neg__|__pow__|__radd__|__rdiv__|__rmul__|__rpow__|__rsub__|__sub__|__xor__|cross|curl|diff|divergence|dot|expand|func|gradient|laplace|magnitude|normalize'}
+{'type':'umlshape', 'id':'VectorSymbol', 'x':180, 'y':291, 'width':138, 'height':218, 'attrs': '_bold|_italic|_unit_vec_symbol|_vec_symbol|free_symbols|is_Vector|is_symbol|name', 'meths': '__new__|doit'}
+{'type':'umlshape', 'id':'VectorZero', 'x':278, 'y':10, 'width':138, 'height':138, 'attrs': 'is_ZeroVector', 'meths': '__new__|_eval_derivative|magnitude|normalize'}
+{'type':'umlshape', 'id':'VectorOne', 'x':466, 'y':10, 'width':138, 'height':80, 'attrs': '', 'meths': '__new__|_eval_derivative'}
+{'type':'umlshape', 'id':'Nabla', 'x':90, 'y':55, 'width':138, 'height':186, 'attrs': 'grad|lap', 'meths': '__new__|_eval_derivative|gradient|laplace|magnitude|normalize'}
+{'type':'umlshape', 'id':'WildVectorSymbol', 'x':102, 'y':568, 'width':170, 'height':64, 'attrs': '', 'meths': '__new__'}
+{'type':'umlshape', 'id':'Normalize', 'x':556, 'y':958, 'width':114, 'height':122, 'attrs': 'is_Normalized|is_Vector', 'meths': '__new__|doit'}
+{'type':'umlshape', 'id':'Magnitude', 'x':433, 'y':865, 'width':100, 'height':122, 'attrs': 'is_Vector|is_positive', 'meths': '__new__|doit'}
+{'type':'umlshape', 'id':'D', 'x':429, 'y':283, 'width':138, 'height':106, 'attrs': 'is_Vector', 'meths': '__new__|_eval_derivative'}
+{'type':'umlshape', 'id':'DotCross', 'x':869, 'y':319, 'width':138, 'height':154, 'attrs': 'reverse', 'meths': '_eval_derivative|_get_coeff|_get_vector|diff|expand'}
+{'type':'umlshape', 'id':'VecDot', 'x':1177, 'y':161, 'width':106, 'height':170, 'attrs': 'is_Dot|is_Vector|is_scalar|reverse', 'meths': '__new__|doit|expand'}
+{'type':'umlshape', 'id':'VecCross', 'x':1175, 'y':349, 'width':122, 'height':170, 'attrs': 'is_Cross|is_Vector|is_commutative|reverse', 'meths': '__new__|doit|expand'}
+{'type':'umlshape', 'id':'Advection', 'x':1128, 'y':588, 'width':122, 'height':122, 'attrs': 'is_Vector|is_commutative', 'meths': '__new__|doit'}
+{'type':'umlshape', 'id':'Grad', 'x':1043, 'y':477, 'width':82, 'height':122, 'attrs': 'is_Vector', 'meths': '__new__|doit|expand'}
+{'type':'umlshape', 'id':'Laplace', 'x':236, 'y':900, 'width':82, 'height':122, 'attrs': 'is_Vector', 'meths': '__new__|doit|expand'}
+{'type':'umlshape', 'id':'VecAdd', 'x':855, 'y':747, 'width':122, 'height':122, 'attrs': 'is_VecAdd|is_commutative', 'meths': '__new__|doit'}
+{'type':'umlshape', 'id':'VecMul', 'x':1169, 'y':723, 'width':202, 'height':154, 'attrs': 'is_VecMul|is_commutative', 'meths': '__new__|_eval_derivative|_eval_derivative_n_times|doit'}
+{'type':'umlshape', 'id':'VecPow', 'x':807, 'y':1008, 'width':70, 'height':106, 'attrs': 'base|exp', 'meths': '__new__'}
+{'type':'umlshape', 'id':'Pow', 'x':959, 'y':978, 'width':40, 'height':28, 'attrs': '', 'meths': ''}
+{'type':'umlshape', 'id':'Add', 'x':988, 'y':840, 'width':40, 'height':28, 'attrs': '', 'meths': ''}
+{'type':'umlshape', 'id':'Mul', 'x':1481, 'y':772, 'width':40, 'height':28, 'attrs': '', 'meths': ''}
+{'type':'umlshape', 'id':'Wild', 'x':55, 'y':686, 'width':50, 'height':28, 'attrs': '', 'meths': ''}
+{'type':'umlshape', 'id':'Expr', 'x':648, 'y':58, 'width':50, 'height':28, 'attrs': '', 'meths': ''}
+{'type':'edge', 'id':'Advection_to_VectorExpr', 'source':'Advection', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecPow_to_VectorExpr', 'source':'VecPow', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'DotCross_to_VectorExpr', 'source':'DotCross', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecCross_to_DotCross', 'source':'VecCross', 'target':'DotCross', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecPow_to_Pow', 'source':'VecPow', 'target':'Pow', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecAdd_to_VectorExpr', 'source':'VecAdd', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'Grad_to_VectorExpr', 'source':'Grad', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'Magnitude_to_VectorExpr', 'source':'Magnitude', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'Nabla_to_VectorSymbol', 'source':'Nabla', 'target':'VectorSymbol', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecAdd_to_Add', 'source':'VecAdd', 'target':'Add', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'Normalize_to_VectorExpr', 'source':'Normalize', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'WildVectorSymbol_to_VectorSymbol', 'source':'WildVectorSymbol', 'target':'VectorSymbol', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecMul_to_Mul', 'source':'VecMul', 'target':'Mul', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'D_to_VectorExpr', 'source':'D', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'WildVectorSymbol_to_Wild', 'source':'WildVectorSymbol', 'target':'Wild', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VectorOne_to_VectorSymbol', 'source':'VectorOne', 'target':'VectorSymbol', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VectorSymbol_to_VectorExpr', 'source':'VectorSymbol', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecDot_to_DotCross', 'source':'VecDot', 'target':'DotCross', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VectorExpr_to_Expr', 'source':'VectorExpr', 'target':'Expr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'Laplace_to_VectorExpr', 'source':'Laplace', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VecMul_to_VectorExpr', 'source':'VecMul', 'target':'VectorExpr', 'uml_edge_type': 'generalisation'}
+{'type':'edge', 'id':'VectorZero_to_VectorSymbol', 'source':'VectorZero', 'target':'VectorSymbol', 'uml_edge_type': 'generalisation'}
