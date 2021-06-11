@@ -12,21 +12,23 @@ from sympy import (
     Symbol, Function, Number, Wild, fraction, postorder_traversal,
     symbols
 )
+from sympy.core.add import add
+from sympy.core.mul import mul
 from sympy.core.compatibility import (
     default_sort_key, with_metaclass, reduce
 )
 from sympy.core.decorators import call_highest_priority, _sympifyit
 #from sympy.core.evalf import EvalfMixin
-#from sympy.core.function import UndefinedFunction
-#from sympy.core.operations import AssocOp
+from sympy.core.function import UndefinedFunction
+from sympy.core.operations import AssocOp
 #from sympy.core.singleton import Singleton
 from sympy.strategies import flatten, typed
 from sympy.utilities.iterables import ordered
-from sympy.core.kind import Kind
+from sympy.core.kind import Kind, NumberKind
 
-from sympy.strategies import (sort, condition, exhaust, do_one)
+from sympy.strategies import (sort, condition, exhaust, do_one, glom, unpack, flatten)
 from sympy.utilities.iterables import sift
-from operator import add, mul
+# from operator import add, mul
 
 from sympy.vector import (
     Vector,
@@ -35,17 +37,17 @@ from sympy.vector import (
 
 """Kinds of Mathematical Objects"""
 
-class _VectorKind(Kind):
+class VectorKind(Kind):
     """
     Kind for all Vectors and Vector Functions. Since a vector function obeys all the same mathematical rules a vector
     """
-    def __new__(cls):
-        return super().__new__(cls)
+    def __new__(cls, element_kind=NumberKind):
+        obj = super().__new__(cls, element_kind)
+        obj.element_kind = element_kind
+        return obj
 
     def __repr__(self):
-        return "VectorKind"
-
-VectorKind = _VectorKind()
+        return "VectorKind(%s)" % self.element_kind
 
 class _VectorOperatorKind(Kind):
     """
@@ -78,6 +80,8 @@ class VectorExpr(Expr):
     is_symbol = False
     is_scalar = False
     is_commutative = True
+
+    kind = VectorKind()
 
     _op_priority = 11
     
@@ -158,84 +162,84 @@ class VectorExpr(Expr):
 
      
     
-    def expand(self, deep=True, modulus=None, power_base=True, power_exp=True,
-            mul=True, log=True, multinomial=True, basic=True, **hints):
-        if isinstance(self, VectorSymbol):
-            return self
+#     # def expand(self, deep=True, modulus=None, power_base=True, power_exp=True,
+#     #         mul=True, log=True, multinomial=True, basic=True, **hints):
+#     #     if isinstance(self, VectorSymbol):
+#     #         return self
 
-        _spaces.append(_token)
-        debug("VectorExpr expand", self)
-        # first expand dot and cross products
-        A, B = [WVS(t) for t in ["A", "B"]]
-        def func(expr, pattern, prev=None):
-            # debug("\n", hints)
-            old = expr
-            found = list(ordered(list(expr.find(pattern))))
-            # print("func", expr)
-            # debug("found", found)
-            # print("found", found)
-            for f in found:
-                fexp = f.expand(**hints)
-                # debug("\t fexp", fexp)
-                if f != fexp:
-                    expr = expr.xreplace({f: fexp})
-            # debug("expr", expr)
-            if old != expr:
-                expr = func(expr, pattern)
-            return expr
+#     #     _spaces.append(_token)
+#     #     debug("VectorExpr expand", self)
+#     #     # first expand dot and cross products
+#     #     A, B = [WVS(t) for t in ["A", "B"]]
+#     #     def func(expr, pattern, prev=None):
+#     #         # debug("\n", hints)
+#     #         old = expr
+#     #         found = list(ordered(list(expr.find(pattern))))
+#     #         # print("func", expr)
+#     #         # debug("found", found)
+#     #         # print("found", found)
+#     #         for f in found:
+#     #             fexp = f.expand(**hints)
+#     #             # debug("\t fexp", fexp)
+#     #             if f != fexp:
+#     #                 expr = expr.xreplace({f: fexp})
+#     #         # debug("expr", expr)
+#     #         if old != expr:
+#     #             expr = func(expr, pattern)
+#     #         return expr
 
-        expr = func(self, A ^ B)
-        # print("expr", expr)
-        expr = func(expr, A & B)
-        # print("expr", expr)
-        expr = func(expr, Grad)
-        expr = func(expr, Laplace)
-        # print("expr", expr)
+#     #     expr = func(self, A ^ B)
+#     #     # print("expr", expr)
+#     #     expr = func(expr, A & B)
+#     #     # print("expr", expr)
+#     #     expr = func(expr, Grad)
+#     #     expr = func(expr, Laplace)
+#     #     # print("expr", expr)
 
-        del _spaces[-1]
-        return Expr.expand(expr, deep=deep, modulus=modulus, power_base=power_base,
-            power_exp=power_exp, mul=mul, log=log, multinomial=multinomial, 
-            basic=basic, **hints)
+#     #     del _spaces[-1]
+#     #     return Expr.expand(expr, deep=deep, modulus=modulus, power_base=power_base,
+#     #         power_exp=power_exp, mul=mul, log=log, multinomial=multinomial, 
+#     #         basic=basic, **hints)
 
-def get_postprocessor(cls):
-    def _postprocessor(expr):
-        vec_class = {Mul: VecMul, Add: VecAdd, Pow: VecPow}[cls]
-        nonvectors = []
-        vectors = []
+# # def get_postprocessor(cls):
+# #     def _postprocessor(expr):
+# #         vec_class = {Mul: VecMul, Add: VecAdd, Pow: VecPow}[cls]
+# #         nonvectors = []
+# #         vectors = []
 
-        print("POST-PROCESSOR", cls)
+# #         print("POST-PROCESSOR", cls)
 
-        for term in expr.args:
-            print("\t", term.func, term)
-            # if isinstance(term, (VectorExpr, Vector)):
-            if term.has(VectorExpr) or term.has(Vector):
-                vectors.append(term)
-            else:
-                nonvectors.append(term)
+# #         for term in expr.args:
+# #             print("\t", term.func, term)
+# #             # if isinstance(term, (VectorExpr, Vector)):
+# #             if term.has(VectorExpr) or term.has(Vector):
+# #                 vectors.append(term)
+# #             else:
+# #                 nonvectors.append(term)
         
-        if not vectors:
-            print("YEAH")
-            return cls._from_args(nonvectors)
+# #         if not vectors:
+# #             print("YEAH")
+# #             return cls._from_args(nonvectors)
         
         
-        print("\tvectors", vectors)
-        print("\tnonvectors", nonvectors)
+# #         print("\tvectors", vectors)
+# #         print("\tnonvectors", nonvectors)
 
-        if vec_class == VecAdd or vec_class == VecMul:
-            return vec_class(*nonvectors, *vectors, evaluate=True)
-        else:
-            return vec_class(*expr.args)
-    return _postprocessor
+# #         if vec_class == VecAdd or vec_class == VecMul:
+# #             return vec_class(*nonvectors, *vectors, evaluate=True)
+# #         else:
+# #             return vec_class(*expr.args)
+# #     return _postprocessor
 
-Basic._constructor_postprocessor_mapping[VectorExpr] = {
-    "Mul": [get_postprocessor(Mul)],
-    "Add": [get_postprocessor(Add)],
-    "Pow": [get_postprocessor(Pow)],
-}
+# # Basic._constructor_postprocessor_mapping[VectorExpr] = {
+# #     "Mul": [get_postprocessor(Mul)],
+# #     "Add": [get_postprocessor(Add)],
+# #     "Pow": [get_postprocessor(Pow)],
+# # }
 
-"""
-Symbolic Vector Section
-"""
+# """
+# Symbolic Vector Section
+# """
 
 class VectorSymbol(VectorExpr):
     """ Symbolic representation of a Vector object.
@@ -329,86 +333,89 @@ VectorSymbol.zero = VectorZero()
 VectorSymbol.one = VectorOne()
 
 
-class WildVectorSymbol(Wild, VectorSymbol):
-    def __new__(cls, name, exclude=(), properties=(), **assumptions):
-        obj = Wild.__new__(cls, name, exclude=(), properties=(), **assumptions)
-        return obj
+# class WildVectorSymbol(Wild, VectorSymbol):
+#     def __new__(cls, name, exclude=(), properties=(), **assumptions):
+#         obj = Wild.__new__(cls, name, exclude=(), properties=(), **assumptions)
+#         return obj
 
-WVS = WildVectorSymbol
+# WVS = WildVectorSymbol
 
-class UnitVector(VectorSymbol):
-    """ Symbolic representation of a normalized symbolic vector a.k.a a unit vector.
-    Given a vector v, the normalized form is: v / v.magnitude
-    """
-    is_Normalized = True
-    is_Vector = True
-
-    def __new__(cls, v):
-        v = sympify(v)
-        if isinstance(v, Normalize):
-            return v
-        if not isinstance(v, (VectorExpr, Vector)):
-            raise TypeError("Can only normalize instances of VectorExpr or Vector.")
-        if not v.is_Vector:
-            raise TypeError("VectorExpr must be a vector, not a scalar.")
-        if isinstance(v, (Nabla, VectorZero)):
-            return v.norm
-        return Basic.__new__(cls, v)
-    
-    def doit(self, **kwargs):
-        deep = kwargs.get('deep', True)
-        args = self.args
-        if deep:
-            args = [arg.doit(**kwargs) for arg in args]
-
-        if issubclass(args[0].func, Vector):
-            # here args[0] could be an instance of VectorAdd or VecMul or Vector
-            return args[0].normalize()
-
-        return VecMul(args[0], VecPow(Magnitude(args[0]), -1))
-
-#Magnitude should be a method of the VectorSymbol Class (if its not already)    
-# class Magnitude(VectorExpr):
-#     """ Symbolic representation of the magnitude of a symbolic vector.
+# class UnitVector(VectorSymbol):
+#     """ Symbolic representation of a normalized symbolic vector a.k.a a unit vector.
+#     Given a vector v, the normalized form is: v / v.magnitude
 #     """
-#     is_Vector = False
-#     is_positive = True
+#     is_Normalized = True
+#     is_Vector = True
 
 #     def __new__(cls, v):
 #         v = sympify(v)
-#         if isinstance(v, Magnitude):
+#         if isinstance(v, Normalize):
 #             return v
 #         if not isinstance(v, (VectorExpr, Vector)):
-#             # for example, v is a number, or symbol
-#             return Abs(v)
+#             raise TypeError("Can only normalize instances of VectorExpr or Vector.")
 #         if not v.is_Vector:
-#             # for example, dot-product of two VectorSymbol
-#             return Abs(v)
-#         if isinstance(v, Nabla):
-#             return v.mag
+#             raise TypeError("VectorExpr must be a vector, not a scalar.")
+#         if isinstance(v, (Nabla, VectorZero)):
+#             return v.norm
 #         return Basic.__new__(cls, v)
     
 #     def doit(self, **kwargs):
 #         deep = kwargs.get('deep', True)
 #         args = self.args
 #         if deep:
-#             args = [arg.doit(**kwargs) for arg in self.args]
+#             args = [arg.doit(**kwargs) for arg in args]
 
-#         if isinstance(args[0], Vector):
-#             return args[0].magnitude()
-#         return self.func(*args)
+#         if issubclass(args[0].func, Vector):
+#             # here args[0] could be an instance of VectorAdd or VecMul or Vector
+#             return args[0].normalize()
 
-"""
-Vector Function Section
-"""
+#         return VecMul(args[0], VecPow(Magnitude(args[0]), -1))
 
-class VectorFunction(Function, VectorExpr):
+# #Magnitude should be a method of the VectorSymbol Class (if its not already)    
+# # class Magnitude(VectorExpr):
+# #     """ Symbolic representation of the magnitude of a symbolic vector.
+# #     """
+# #     is_Vector = False
+# #     is_positive = True
+
+# #     def __new__(cls, v):
+# #         v = sympify(v)
+# #         if isinstance(v, Magnitude):
+# #             return v
+# #         if not isinstance(v, (VectorExpr, Vector)):
+# #             # for example, v is a number, or symbol
+# #             return Abs(v)
+# #         if not v.is_Vector:
+# #             # for example, dot-product of two VectorSymbol
+# #             return Abs(v)
+# #         if isinstance(v, Nabla):
+# #             return v.mag
+# #         return Basic.__new__(cls, v)
     
-    kind = VectorKind
+# #     def doit(self, **kwargs):
+# #         deep = kwargs.get('deep', True)
+# #         args = self.args
+# #         if deep:
+# #             args = [arg.doit(**kwargs) for arg in self.args]
 
-    
-    def __new__(cls, name, **kwargs):
-        return super().__new__(cls)
+# #         if isinstance(args[0], Vector):
+# #             return args[0].magnitude()
+# #         return self.func(*args)
+
+# """
+# Vector Function Section
+# """
+
+class VectorFunction(UndefinedFunction):
+
+    kind = VectorKind()
+    is_Vector = True
+    # # def __new__(cls, name, **kwargs):
+    # #     return super().__new__(cls)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_Vector = True
     
     def gradient(self):
         return VectorGrad(self)
@@ -439,117 +446,117 @@ class VectorFunction(Function, VectorExpr):
         return self.laplace()
 
 
-#A gradient (of a scalar function) is a special type of vector function, 
-# it is necessary to have this special case for simplification rules, such as curl(grad(F)) = 0 and del.dot(grad(F)) = Laplace(F)
-# this class should display as Del(F), with an option to omit the paranthesis, as fluid mechs like to
-#Note that this class does not necessarily need the Del operator to be defined yet
+# #A gradient (of a scalar function) is a special type of vector function, 
+# # it is necessary to have this special case for simplification rules, such as curl(grad(F)) = 0 and del.dot(grad(F)) = Laplace(F)
+# # this class should display as Del(F), with an option to omit the paranthesis, as fluid mechs like to
+# #Note that this class does not necessarily need the Del operator to be defined yet
 
-# _print_Gradient is already used in pretty_print, hence the name Gradient
+# # _print_Gradient is already used in pretty_print, hence the name Gradient
 
-class VectorGrad(VectorFunction):
-    """ Symbolic representation of the gradient of a scalar field.
-    """
-    is_Vector = True
-    
-    def __new__(cls, arg1, arg2=None, **kwargs):
-        # Ideally, only the scalar field is required. However, it can
-        # accept also the nabla operator (in case of some rendering
-        # customization)
-        if not arg2:
-            n = Nabla()
-            f = sympify(arg1)
-        else:
-            n = sympify(arg1)
-            f = sympify(arg2)
-        
-        if not isinstance(n, Nabla):
-            raise TypeError("The first argument of the gradient operator must be Nabla.")
-        if isinstance(f, Nabla):
-            raise NotImplementedError("Differentiation of nabla operator not implemented.")
-        if f.is_Vector:
-            raise TypeError("Gradient of vector fields not implemented.")
-        return Basic.__new__(cls, n, f)
-    
-    def doit(self, **kwargs):
-        deep = kwargs.get('deep', True)
-        args = self.args
-        if deep:
-            args = [arg.doit(**kwargs) for arg in args]
-
-        # TODO: is the following condition ok?
-        if not isinstance(args[1], VectorExpr):
-            return gradient(args[1])
-        return self.func(*args)
-    
-    def expand(self, **hints):
-        gradient = hints.get('gradient', False)
-        prod = hints.get('prod', False)
-        quotient = hints.get('quotient', False)
-
-        if gradient:
-            if isinstance(self.args[1], Add):
-                return VecAdd(*[self.func(a).expand(**hints) for a in self.args[1].args])
-            
-            # if isinstance(self.args[1], Mul):
-            num, den = fraction(self.args[1])
-            if den != S.One and quotient:
-                # quotient rule
-                return (den * Grad(num) - num * Grad(den)) / den**2
-            if prod and den == 1:
-                # product rule
-                args = self.args[1].args
-                if len(args) > 1:
-                    new_args = []
-                    for i, a in enumerate(args):
-                        new_args.append(
-                            VecMul(*args[:i], *args[i+1:], self.func(a))
-                        )
-                    return VecAdd(*new_args)
-        return self
-
-def symGrad(F):
-    #If F is a sympy Function object, then return a VectorGrad object
-    #If F is a VectorFunction object, then return a Tensor object
-    pass
-
-
-# This should go away with the kind attribute
-# class D(VectorExpr):
-#     """ Represent an unevaluated derivative.
-
-#     This class is necessary because even if it's possible to set the attribute
-#     is_Vector=True to an unevaluated Derivative (as of Sympy version 1.5.1, 
-#     which may be a bug), it is not possible to set this attribute to objects of 
-#     type  Add (read-only property). If v1 and v2 are two vector expression 
-#     with is_Vector=True:
-#         d = Derivative(v1 + v2, x).doit()
-#     will return Add(Derivative(v1, x), Derivative(v2, x)), with 
-#     is_Vector=False, which is wrong, preventing from further vector expression 
-#     operations. For example, VecCross(v1, d) will fail because 
-#     d.is_Vector=False.
-
-#     Solution! Wrap unevaluated derivatives with this class.
+# class VectorGrad(VectorFunction):
+#     """ Symbolic representation of the gradient of a scalar field.
 #     """
-#     is_Vector = False
-
-#     def __new__(cls, d):
-#         d = sympify(d)
-#         if not isinstance(d, Derivative):
-#             return d
-        
-#         obj = Basic.__new__(cls, d)
-#         obj.is_Vector = d.expr.is_Vector
-#         obj.is_scalar = d.expr.is_scalar  #TD 5/30/21
-#         return obj
+#     is_Vector = True
     
-#     def _eval_derivative(self, s):
-#         d = self.args[0]
-#         variable_count = list(d.variable_count) + [(s, 1)]
-#         return D(Derivative(d.expr, *variable_count))
+#     def __new__(cls, arg1, arg2=None, **kwargs):
+#         # Ideally, only the scalar field is required. However, it can
+#         # accept also the nabla operator (in case of some rendering
+#         # customization)
+#         if not arg2:
+#             n = Nabla()
+#             f = sympify(arg1)
+#         else:
+#             n = sympify(arg1)
+#             f = sympify(arg2)
+        
+#         if not isinstance(n, Nabla):
+#             raise TypeError("The first argument of the gradient operator must be Nabla.")
+#         if isinstance(f, Nabla):
+#             raise NotImplementedError("Differentiation of nabla operator not implemented.")
+#         if f.is_Vector:
+#             raise TypeError("Gradient of vector fields not implemented.")
+#         return Basic.__new__(cls, n, f)
+    
+#     def doit(self, **kwargs):
+#         deep = kwargs.get('deep', True)
+#         args = self.args
+#         if deep:
+#             args = [arg.doit(**kwargs) for arg in args]
 
-"""
-Dot product and Cross product Section
-"""
+#         # TODO: is the following condition ok?
+#         if not isinstance(args[1], VectorExpr):
+#             return gradient(args[1])
+#         return self.func(*args)
+    
+#     def expand(self, **hints):
+#         gradient = hints.get('gradient', False)
+#         prod = hints.get('prod', False)
+#         quotient = hints.get('quotient', False)
+
+#         if gradient:
+#             if isinstance(self.args[1], Add):
+#                 return VecAdd(*[self.func(a).expand(**hints) for a in self.args[1].args])
+            
+#             # if isinstance(self.args[1], Mul):
+#             num, den = fraction(self.args[1])
+#             if den != S.One and quotient:
+#                 # quotient rule
+#                 return (den * Grad(num) - num * Grad(den)) / den**2
+#             if prod and den == 1:
+#                 # product rule
+#                 args = self.args[1].args
+#                 if len(args) > 1:
+#                     new_args = []
+#                     for i, a in enumerate(args):
+#                         new_args.append(
+#                             VecMul(*args[:i], *args[i+1:], self.func(a))
+#                         )
+#                     return VecAdd(*new_args)
+#         return self
+
+# def symGrad(F):
+#     #If F is a sympy Function object, then return a VectorGrad object
+#     #If F is a VectorFunction object, then return a Tensor object
+#     pass
+
+
+# # This should go away with the kind attribute
+# # class D(VectorExpr):
+# #     """ Represent an unevaluated derivative.
+
+# #     This class is necessary because even if it's possible to set the attribute
+# #     is_Vector=True to an unevaluated Derivative (as of Sympy version 1.5.1, 
+# #     which may be a bug), it is not possible to set this attribute to objects of 
+# #     type  Add (read-only property). If v1 and v2 are two vector expression 
+# #     with is_Vector=True:
+# #         d = Derivative(v1 + v2, x).doit()
+# #     will return Add(Derivative(v1, x), Derivative(v2, x)), with 
+# #     is_Vector=False, which is wrong, preventing from further vector expression 
+# #     operations. For example, VecCross(v1, d) will fail because 
+# #     d.is_Vector=False.
+
+# #     Solution! Wrap unevaluated derivatives with this class.
+# #     """
+# #     is_Vector = False
+
+# #     def __new__(cls, d):
+# #         d = sympify(d)
+# #         if not isinstance(d, Derivative):
+# #             return d
+        
+# #         obj = Basic.__new__(cls, d)
+# #         obj.is_Vector = d.expr.is_Vector
+# #         obj.is_scalar = d.expr.is_scalar  #TD 5/30/21
+# #         return obj
+    
+# #     def _eval_derivative(self, s):
+# #         d = self.args[0]
+# #         variable_count = list(d.variable_count) + [(s, 1)]
+# #         return D(Derivative(d.expr, *variable_count))
+
+# """
+# Dot product and Cross product Section
+# """
 
 class DotCross(VectorExpr):
     """ Abstract base class for VecCross and VecDot.
@@ -788,9 +795,9 @@ class VecCross(DotCross):
         right = self.args[1].expand(**hints)
         return self.func(left, right)
 
-"""
-Vector Operator Section
-"""
+# """
+# Vector Operator Section
+# """
 
 
 class VectorOperator(VectorExpr):
@@ -824,109 +831,109 @@ class Nabla(VectorOperator):
     def _eval_derivative(self, s):
         raise NotImplementedError("Differentiation of nabla operator not implemented.")
 
-class Laplace(VectorOperator):
-    """ Symbolic representation of the Laplacian operator.
-    """
-    is_Vector = False
-    
-    def __new__(cls, arg1, arg2=None, **kwargs):
-        # Ideally, only the scalar/vector field is required. However, it can
-        # accept also the nabla operator (in case of some rendering
-        # customization)
-        if not arg2:
-            n = Nabla()
-            f = sympify(arg1)
-        else:
-            n = sympify(arg1)
-            f = sympify(arg2)
-        
-        if not isinstance(n, Nabla):
-            raise TypeError("The first argument of the laplace operator must be Nabla.")
-        if isinstance(f, Nabla):
-            raise NotImplementedError("Differentiation of nabla operator not implemented.")
-        # if f.is_Vector:
-        #     raise TypeError("Gradient of vector fields not implemented.")
-        obj = Basic.__new__(cls, n, f)
-        if f.is_Vector:
-            obj.is_Vector = True
-        return obj
-    
-    def doit(self, **kwargs):
-        deep = kwargs.get('deep', True)
-        args = self.args
-        if deep:
-            args = [arg.doit(**kwargs) for arg in args]
-
-        if not isinstance(args[1], (Vector, VectorExpr)):
-            # scalar field: we use the identity nabla^2 = nabla.div(f.grad())
-            return VecDot(args[0], Grad(args[0], args[1])).doit(deep=deep)
-        elif isinstance(args[1], Vector):
-            components = args[1].components
-            laplace = lambda c: VecDot(args[0], Grad(args[0], c)).doit()
-            v = Vector.zero
-            for base, comp in components.items():
-                v += base * laplace(comp)
-            return v
-        return self.func(*args)
-    
-    def expand(self, **hints):
-        laplacian = hints.get('laplacian', False)
-        prod = hints.get('prod', False)
-        if laplacian:
-            if isinstance(self.args[1], Add):
-                return VecAdd(*[self.func(a).expand(**hints) for a in self.args[1].args])
-            if prod:
-                # product rule:
-                n, f = self.args
-                args = f.args
-                if (len(args) == 2) and all([not a.is_Vector for a in args]):
-                    return args[0] * Laplace(n, args[1]) + args[1] * Laplace(n, args[0]) + 2 * (Grad(n, args[0]) & Grad(n, args[1]))
-        return self
-    
-    
-# class Advection(VectorExpr):
-#     """ Symbolic representation of the following operator/expression:
-#         (v & nabla) * f
-#     where:
-#         v : vector
-#         f : vector or scalar field
-#     Note that this is different than (nabla & v) * f, because (nabla & v) is the
-#     divergence of v.
+# class Laplace(VectorOperator):
+#     """ Symbolic representation of the Laplacian operator.
 #     """
-#     is_Vector = True
-#     is_commutative = False
-
-#     def __new__(cls, v, f, n = Nabla()):
-#         v = sympify(v)
-#         f = sympify(f)
+#     is_Vector = False
+    
+#     def __new__(cls, arg1, arg2=None, **kwargs):
+#         # Ideally, only the scalar/vector field is required. However, it can
+#         # accept also the nabla operator (in case of some rendering
+#         # customization)
+#         if not arg2:
+#             n = Nabla()
+#             f = sympify(arg1)
+#         else:
+#             n = sympify(arg1)
+#             f = sympify(arg2)
+        
 #         if not isinstance(n, Nabla):
-#             raise TypeError("n must be an instance of the class Nabla.")
-#         if (not v.is_Vector) or isinstance(v, Nabla):
-#             raise TypeError("v must be a vector or an expression with is_Vector=True. It must not be nabla.")
+#             raise TypeError("The first argument of the laplace operator must be Nabla.")
 #         if isinstance(f, Nabla):
-#             raise TypeError("f (the field) cannot be nabla.")
-
-#         obj = Expr.__new__(cls, v, f, n)
-#         obj.is_Vector = v.is_Vector
+#             raise NotImplementedError("Differentiation of nabla operator not implemented.")
+#         # if f.is_Vector:
+#         #     raise TypeError("Gradient of vector fields not implemented.")
+#         obj = Basic.__new__(cls, n, f)
+#         if f.is_Vector:
+#             obj.is_Vector = True
 #         return obj
     
 #     def doit(self, **kwargs):
 #         deep = kwargs.get('deep', True)
-
 #         args = self.args
 #         if deep:
 #             args = [arg.doit(**kwargs) for arg in args]
-        
-#         v, f, n = args
-#         if not f.is_Vector and isinstance(v, Vector):
-#             return v & Grad(f).doit(**kwargs)
-#         if isinstance(f, Vector) and isinstance(v, Vector):
-#             s = Vector.zero
-#             for e, comp in f.components.items():
-#                 s += e * Advection(v, comp).doit(**kwargs)
-#             return s
 
+#         if not isinstance(args[1], (Vector, VectorExpr)):
+#             # scalar field: we use the identity nabla^2 = nabla.div(f.grad())
+#             return VecDot(args[0], Grad(args[0], args[1])).doit(deep=deep)
+#         elif isinstance(args[1], Vector):
+#             components = args[1].components
+#             laplace = lambda c: VecDot(args[0], Grad(args[0], c)).doit()
+#             v = Vector.zero
+#             for base, comp in components.items():
+#                 v += base * laplace(comp)
+#             return v
 #         return self.func(*args)
+    
+#     def expand(self, **hints):
+#         laplacian = hints.get('laplacian', False)
+#         prod = hints.get('prod', False)
+#         if laplacian:
+#             if isinstance(self.args[1], Add):
+#                 return VecAdd(*[self.func(a).expand(**hints) for a in self.args[1].args])
+#             if prod:
+#                 # product rule:
+#                 n, f = self.args
+#                 args = f.args
+#                 if (len(args) == 2) and all([not a.is_Vector for a in args]):
+#                     return args[0] * Laplace(n, args[1]) + args[1] * Laplace(n, args[0]) + 2 * (Grad(n, args[0]) & Grad(n, args[1]))
+#         return self
+    
+    
+# # class Advection(VectorExpr):
+# #     """ Symbolic representation of the following operator/expression:
+# #         (v & nabla) * f
+# #     where:
+# #         v : vector
+# #         f : vector or scalar field
+# #     Note that this is different than (nabla & v) * f, because (nabla & v) is the
+# #     divergence of v.
+# #     """
+# #     is_Vector = True
+# #     is_commutative = False
+
+# #     def __new__(cls, v, f, n = Nabla()):
+# #         v = sympify(v)
+# #         f = sympify(f)
+# #         if not isinstance(n, Nabla):
+# #             raise TypeError("n must be an instance of the class Nabla.")
+# #         if (not v.is_Vector) or isinstance(v, Nabla):
+# #             raise TypeError("v must be a vector or an expression with is_Vector=True. It must not be nabla.")
+# #         if isinstance(f, Nabla):
+# #             raise TypeError("f (the field) cannot be nabla.")
+
+# #         obj = Expr.__new__(cls, v, f, n)
+# #         obj.is_Vector = v.is_Vector
+# #         return obj
+    
+# #     def doit(self, **kwargs):
+# #         deep = kwargs.get('deep', True)
+
+# #         args = self.args
+# #         if deep:
+# #             args = [arg.doit(**kwargs) for arg in args]
+        
+# #         v, f, n = args
+# #         if not f.is_Vector and isinstance(v, Vector):
+# #             return v & Grad(f).doit(**kwargs)
+# #         if isinstance(f, Vector) and isinstance(v, Vector):
+# #             s = Vector.zero
+# #             for e, comp in f.components.items():
+# #                 s += e * Advection(v, comp).doit(**kwargs)
+# #             return s
+
+# #         return self.func(*args)
 
 """
 Vector Add, Multiple and Power classes
@@ -943,64 +950,89 @@ class VecAdd(VectorExpr, Add):
     def __new__(cls, *args, **kwargs):
         evaluate = kwargs.get('evaluate', True)
 
+        debug("VecAdd", args, at=True)
         if not args:
+            debug("Exiting VecAdd. Empty args", rt=True)
             return VectorZero()
 
         args = list(map(sympify, args))
+        debug("VecAdd -> symplified args:", args)
+
         # If for any reasons we create VecAdd(0), I want 0 to be returned.
         # Skipping this check, VectorZero() will be returned instead
         if len(args) == 1 and args[0] == S.Zero:
+            debug("Exiting VecAdd. VecAdd -> len(args) == 1 and args[0] == S.Zero -> return S.Zero", rt=True)
             return S.Zero
         
+        # obj = Basic.__new__(cls, *args)
+
         if evaluate:
             # remove instances of S.Zero and VectorZero
             args = [a for a in args 
                 if not (isinstance(a, VectorZero) or (a == S.Zero) or (a == Vector.zero))]
+            
+            debug("VecAdd -> evaluate", args)
+
             if len(args) == 0:
+                debug("Exiting VecAdd. VecAdd -> evaluate -> len(args) == 0 -> return VectorZero", rt=True)
                 return VectorZero()
             elif len(args) == 1:
+                debug("Exiting VecAdd. VecAdd -> evaluate -> len(args) == 1 -> returns args[0]", rt=True)
                 # doesn't make any sense to have 1 argument in VecAdd if 
                 # evaluate=True
                 return args[0]
 
-        obj = AssocOp.__new__(cls, *args, evaluate=evaluate)
-        obj = _sanitize_args(obj)
-        
-        # print("VecAdd OBJ", obj.func, obj)
-        if not isinstance(obj, cls):
-            return obj
-
-        # are there any scalars or vectors?
-        any_vectors = any([a.is_Vector for a in obj.args])
-        all_vectors = all([a.is_Vector for a in obj.args])
-
-        # addition of mixed scalars and vectors is not supported.
-        # If there are scalars in the addition, either all arguments
-        # are scalars (hence not a vector expression) or there are
-        # mixed arguments, hence throw an error
-        obj.is_Vector = all_vectors
-
-        if (any_vectors and (not all_vectors)):
-            asd = obj.args[1]
-            print("####", asd.is_Vector, asd.args)
-            print("####", [a.is_Vector for a in asd.args])
-            for a in postorder_traversal(asd):
-                print(a.func, a.is_Vector, a)
-            raise TypeError("VecAdd: Mix of Vector and Scalar symbols:\n\t" + 
-                "\n\t".join(str(a.func) + ", " + str(a.is_Vector) + ", " + str(a) for a in obj.args)
+                
+            # obj = canonicalize(obj)
+            
+        debug("VecAdd -> evaluate -> check kind")
+        # check that all addends are compatible with addition
+        if any([t.is_scalar for t in args]) and any([t.is_Vector for t in args]):
+            raise ValueError(
+                "Mix of vector and scalar symbols. Received:\n" + 
+                "Vectors: {}\n".format([t for t in args if t.is_Vector]) +
+                "Scalars: {}".format([t for t in args if not t.is_Vector])
             )
+
+        obj = AssocOp.__new__(cls, *args, evaluate=evaluate)
+        if not isinstance(obj, cls):
+            # for example, VecAdd(1, 2) returns an Integer, whose is_Vector
+            # attribute is read-only
+            debug("Exiting VecAdd. Not a vector anymore: type(obj)", type(obj), rt=True)
+            
+            # TODO: quick and dirty fix to solve a very troubling problem:
+            # at this point, obj might be an object of type Add or Mul even if 
+            # it contains vectors. How does it happen? That's a million dollar 
+            # question...
+            # Instead of using obj = AssocOp.__new__(cls, *args, evaluate=evaluate)
+            # I tried to use the rules approach (similar to MatAdd), however
+            # I get stuck at a different problem which I'm unable to pinpoint...
+            # Hence, this hack.
+            # Probably we shouldn't be using AssocOp.__new__, because inside it
+            # there is the call to the post-processor. But the new Kind class
+            # has been implemented to surpass the post-processor... Therefore,
+            # we absolutely need to figure it out how to use the rules (see
+            # MatAdd, MatMul for examples).
+            if isinstance(obj, Add):
+                return VecAdd(*obj.args)
+            if isinstance(obj, Mul):
+                return VecMul(*obj.args)
+            return obj
+        obj.is_Vector = all([a.is_Vector for a in obj.args])
+        debug("Exiting VecAdd", rt=True)
         return obj
 
-    def doit(self, **kwargs):
-        # Need to override this method in order to apply the rules defined
-        # below. Adapted from MatAdd.
-        deep = kwargs.get('deep', True)
-        if deep:
-            args = [arg.doit(**kwargs) for arg in self.args]
-        else:
-            args = self.args
-        return canonicalize(VecAdd(*args))
+    # def doit(self, **kwargs):
+    #     # Need to override this method in order to apply the rules defined
+    #     # below. Adapted from MatAdd.
+    #     deep = kwargs.get('deep', True)
+    #     if deep:
+    #         args = [arg.doit(**kwargs) for arg in self.args]
+    #     else:
+    #         args = self.args
+    #     return canonicalize(VecAdd(*args))
 
+add.register_handlerclass((Add, VecAdd), VecAdd)
 
 
 
@@ -1033,9 +1065,49 @@ def merge_explicit(vecadd):
     else:
         return vecadd
 
+
+def unpack2(expr):
+    debug("unpack2", expr, at=True, rt=True)
+    if len(expr.args) == 1:
+        return expr.args[0]
+    else:
+        return expr
+def factor_of(arg): 
+    debug("factor_of", arg, at=True, rt=True)
+    return arg.as_coeff_mul()[0]
+def vector_of(arg):
+    debug("vector_of", arg, at=True, rt=True)
+    return unpack2(arg.as_coeff_mul()[1])
+def combine(cnt, vec):
+    debug("combine", cnt, vec, at=True, rt=True)
+    if cnt == 1:
+        return vec
+    else:
+        return cnt * vec
+
+def glom2(key, count, combine):
+    # debug("glom2", key, count, combine, at=True)
+    def conglomerate(expr):
+        debug("conglomerate", expr, type(expr), at=True)
+        """ Conglomerate together identical args x + x -> 2x """
+        groups = sift(expr.args, key)
+        debug("\tgroups", groups)
+        counts = {k: sum(map(count, args)) for k, args in groups.items()}
+        debug("\tcounts", counts)
+        newargs = [combine(cnt, mat) for mat, cnt in counts.items()]
+        debug("\tnewargs", newargs, rt=True)
+        if set(newargs) != set(expr.args):
+            return Basic.__new__(type(expr), *newargs)
+        else:
+            return expr
+    return conglomerate
+
 rules = (
-    merge_explicit,
-    sort(default_sort_key)
+    unpack2,
+    flatten,
+    glom2(vector_of, factor_of, combine),
+    # merge_explicit,
+    # sort(default_sort_key)
 )
 
 canonicalize = exhaust(condition(lambda x: isinstance(x, VecAdd),
@@ -1051,18 +1123,22 @@ class VecMul(VectorExpr, Mul):
     
     def __new__(cls, *args, **kwargs):
         evaluate = kwargs.get('evaluate', True)
+        debug("VecMul", args, at=True)
 
-        print("VecMul __new__", args)
         if not args:
             # it makes sense to return VectorOne, after all we are talking
             # about VecMul. However, this would play against us when using
             # expand(), because we would have multiplications of multiple 
             # vectors (one of which, VectorOne). 
             # Hence, better to return S.One.
+            debug("Exiting VecMul. Empty args", args, rt=True)
             return S.One
 
         args = list(map(sympify, args))
+        debug("VecMul -> symplified args:", args)
+
         if len(args) == 1:
+            debug("Exiting VecMul -> len(args) == 1 -> return args[0]", rt=True)
             # doesn't make any sense to have 1 argument in VecAdd if 
             # evaluate=True
             return args[0]
@@ -1080,18 +1156,24 @@ class VecMul(VectorExpr, Mul):
 
         vectors = [a.is_Vector for a in args]
         if vectors.count(True) > 1:
-            raise TypeError("Multiplication of vector quantities not supported\n\t" + 
+            raise ValueError(
+                "Multiplication of vector quantities not supported\n\t" + 
                 "\n\t".join(str(a.func) + ", " + str(a) for a in args)
             )
 
-        # remove instances of S.One
-        args = [a for a in args if a is not cls.identity]
-        if len(args) == 0:
-            return S.One
-        if len(args) == 1:
-            return args[0]
+        
             
         if evaluate:
+            # remove instances of S.One
+            args = [a for a in args if a is not cls.identity]
+            # TODO: do I need to perform the following two cheks?
+            if len(args) == 0:
+                debug("Exiting VecMul. Empty args.", rt=True)
+                return S.One
+            if len(args) == 1:
+                debug("Exiting VecMul -> len(args) == 1 -> returns args[0]", rt=True)
+                return args[0]
+            
             # check if any vector is present
             args_is_vector = [a.is_Vector for a in args]
             if any([a == S.Zero for a in args]):
@@ -1103,16 +1185,14 @@ class VecMul(VectorExpr, Mul):
             if (all([not isinstance(a, VectorExpr) for a in args]) and 
                 any([not isinstance(a, Vector) for a in args]) and
                 len(args) > 1):
+                from operator import mul
                 return reduce(mul, args)
-                # return _prod(args)
-        
-        print("\t pre AssocOp.__new__", args)
+
+        debug("VecMul -> pre AssocOp.__new__", args)
+
         obj = AssocOp.__new__(cls, *args, evaluate=evaluate)
-        obj = _sanitize_args(obj)
-        print("\t post AssocOp.__new__", obj.func)
-        for a in obj.args:
-            print("\t\t", a.func, a.is_Vector, a)
-        # obj = obj.func._exec_constructor_postprocessors(obj)
+
+        debug("VecMul -> post AssocOp.__new__", obj.func)
 
         # At this point, obj might not be of type VecMul. We must return
         # otherwise the next checks are going to be applied.
@@ -1123,6 +1203,24 @@ class VecMul(VectorExpr, Mul):
         # vn2 = x * C.i + y * C.j + z * C.k
         # VecMul(3, VecDot(vn1, vn2)).doit() -> Add(x, 2 * y, 3 * z)
         if not isinstance(obj, VecMul):
+            debug("Exiting VecMul -> Not a vector anymore: type(obj)", type(obj), rt=True)
+            # TODO: quick and dirty fix to solve a very troubling problem:
+            # at this point, obj might be an object of type Add or Mul even if 
+            # it contains vectors. How does it happen? That's a million dollar 
+            # question...
+            # Instead of using obj = AssocOp.__new__(cls, *args, evaluate=evaluate)
+            # I tried to use the rules approach (similar to MatAdd), however
+            # I get stuck at a different problem which I'm unable to pinpoint...
+            # Hence, this hack.
+            # Probably we shouldn't be using AssocOp.__new__, because inside it
+            # there is the call to the post-processor. But the new Kind class
+            # has been implemented to surpass the post-processor... Therefore,
+            # we absolutely need to figure it out how to use the rules (see
+            # MatAdd, MatMul for examples).
+            if isinstance(obj, Add):
+                return VecAdd(*obj.args)
+            if isinstance(obj, Mul):
+                return VecMul(*obj.args)
             return obj
         
         vectors = [a.is_Vector for a in obj.args]
@@ -1133,52 +1231,55 @@ class VecMul(VectorExpr, Mul):
             raise TypeError("VecMul: Multiplication of vector quantities not supported\n\t" + 
                 "\n\t".join(str(a.func) + ", " + str(a.is_Vector) + ", " + str(a) for a in obj.args)
             )
+        
+        debug("Exiting VecMul", obj.is_Vector, rt=True)
         return obj
     
-    def doit(self, **kwargs):
-        deep = kwargs.get('deep', True)
-        if deep:
-            args = [arg.doit(**kwargs) for arg in self.args]
-        else:
-            args = self.args
+    # def doit(self, **kwargs):
+    #     deep = kwargs.get('deep', True)
+    #     if deep:
+    #         args = [arg.doit(**kwargs) for arg in self.args]
+    #     else:
+    #         args = self.args
         
-        are_vectors = any([isinstance(a, Vector) for a in args])
-        expr = canonicalize_vecmul(VecMul(*args))
-        # if there were instances of Vector, and the evaluated expression is
-        # VectorZero, we should return Vector.zero (from sympy.vector module)
-        if isinstance(expr, VectorZero) and are_vectors:
-            return Vector.zero
-        return expr
+    #     are_vectors = any([isinstance(a, Vector) for a in args])
+    #     expr = canonicalize_vecmul(VecMul(*args))
+    #     # if there were instances of Vector, and the evaluated expression is
+    #     # VectorZero, we should return Vector.zero (from sympy.vector module)
+    #     if isinstance(expr, VectorZero) and are_vectors:
+    #         return Vector.zero
+    #     return expr
 
-    def _eval_derivative(self, s):
-        # adapted from Mul._eval_derivative
-        args = list(self.args)
-        terms = []
-        for i in range(len(args)):
-            d = args[i].diff(s)
-            if d:
-                # Note: reduce is used in step of Mul as Mul is unable to
-                # handle subtypes and operation priority:
-                terms.append(reduce(lambda x, y: x*y, 
-                    (args[:i] + [d] + args[i + 1:]), S.One))
-        return VecAdd.fromiter(terms)
+    # def _eval_derivative(self, s):
+    #     # adapted from Mul._eval_derivative
+    #     args = list(self.args)
+    #     terms = []
+    #     for i in range(len(args)):
+    #         d = args[i].diff(s)
+    #         if d:
+    #             # Note: reduce is used in step of Mul as Mul is unable to
+    #             # handle subtypes and operation priority:
+    #             terms.append(reduce(lambda x, y: x*y, 
+    #                 (args[:i] + [d] + args[i + 1:]), S.One))
+    #     return VecAdd.fromiter(terms)
     
-    def _eval_derivative_n_times(self, s, n):
-        # adapted from Mul._eval_derivative_n_times
-        from sympy import Integer
-        from sympy.ntheory.multinomial import multinomial_coefficients_iterator
+    # def _eval_derivative_n_times(self, s, n):
+    #     # adapted from Mul._eval_derivative_n_times
+    #     from sympy import Integer
+    #     from sympy.ntheory.multinomial import multinomial_coefficients_iterator
 
-        args = self.args
-        m = len(args)
-        if isinstance(n, (int, Integer)):
-            # https://en.wikipedia.org/wiki/General_Leibniz_rule#More_than_two_factors
-            terms = []
-            for kvals, c in multinomial_coefficients_iterator(m, n):
-                p = VecMul(*[arg.diff((s, k)) for k, arg in zip(kvals, args)])
-                terms.append(c * p)
-            return VecAdd(*terms)
-        raise TypeError("Derivative order must be integer")
+    #     args = self.args
+    #     m = len(args)
+    #     if isinstance(n, (int, Integer)):
+    #         # https://en.wikipedia.org/wiki/General_Leibniz_rule#More_than_two_factors
+    #         terms = []
+    #         for kvals, c in multinomial_coefficients_iterator(m, n):
+    #             p = VecMul(*[arg.diff((s, k)) for k, arg in zip(kvals, args)])
+    #             terms.append(c * p)
+    #         return VecAdd(*terms)
+    #     raise TypeError("Derivative order must be integer")
 
+mul.register_handlerclass((Mul, VecMul), VecMul)
 
 
 
@@ -1266,89 +1367,32 @@ def _compute_is_vector(expr):
         return expr.args[1].is_Vector
     return expr.is_Vector
 
-def _sanitize_args(expr):
-    """ Add.flatten and Mul.flatten could change the value of the 
-    attribute is_Vector of any VectorExpr. Need to recompute the correct
-    value.
-    """
 
-    for a in postorder_traversal(expr):
-        if isinstance(a, VectorExpr):
-            a.is_Vector = _compute_is_vector(a)
-    return expr
 
-def _sanitize_args(obj):
-    """ The methods Add.flatten and Mul.flatten can create arguments of obj that
-    are not post-processed.
-    _sanitize_args looks for arguments of type Add, Mul, Pow and call the
-    post-processor. If the original argument contained a vector expression, 
-    after the post-processor the new argument will be of type VecAdd, VecMul or
-    VecPow.
-    Also, because Add.flatten and Mul.flatten could change the value of the 
-    attribute is_Vector of any VectorExpr, we are going to recompute the correct
-    value.
-    """
-    args = list(obj.args)
-    print("SANITIZE")
-    for i, a in enumerate(args):
-        if isinstance(a, (Add, Mul, Pow)) and (not isinstance(a, VectorExpr)):
-            print("\tasd", a.func, a)
-            args[i] = args[i].func._exec_constructor_postprocessors(args[i]).doit()
-
-        if isinstance(a, VectorExpr):
-            args[i].is_Vector = _compute_is_vector(args[i])
-    
-    # the following is used to avoid infinite recursion
-    if not isinstance(obj, (Add, Mul)):
-        return obj.func(*args)
-    obj = obj.func._from_args(args)
-    if isinstance(obj, VectorExpr):
-        obj.is_Vector = _compute_is_vector(obj)
-    return obj
-
-# used for debugging the expressions trees: append a _token to _spaces each time
-# an object is created. Remember to remove the token once the object has been
-# created
+# used for debugging the expressions trees.
 _spaces = []
 _token = "    "
-_DEBUG = False
-def debug(*args):
+_DEBUG = True
+def debug(*args, at=False, rt=False):
+    """ Prints on the screen only if _DEBUG=True.
+
+    Parameters
+    ==========
+        at: boolean
+            Add Token: add more spaces. Should be set to True whenever we print 
+            from a new method.
+        rt : boolean
+            Remove Token: remove spaces. Should be set to True whenever we leave
+            a method.
+    """
     if _DEBUG:
+        if at:
+            _spaces.append(_token)
+
         print("".join(_spaces), *args)
 
-
-#This should be moved to a test case
-# def wtf():
-#     from sympy import collect_const
-#     a = VectorSymbol("a")
-#     b = VectorSymbol("b")
-#     expr = 3 * a + 3 * b
-#     print(collect_const(expr))
-
-#Unclear what this is used for, looks like a troubleshooting or test case
-# def asd():
-#     x, y, z = symbols("x:z")
-#     a, b, c = [VectorSymbol(t) for t in ["a", "b", "c"]]
-#     nabla = Nabla()
-#     R = CoordSys3D("R")
-#     xx = R.x * R.y
-#     yy = R.x
-#     v = R.x * R.i + R.y * R.j + R.k * R.z
-#     o = R.i + R.j + R.k
-#     expr = nabla ^ (x * y * a)
-#     # expr = expr.expand(prod=True).subs({x: xx, y: yy, a: v})
-#     # expr = VecMul(2, v, a.mag, x, evaluate=False)
-#     # expr = VecMul(VectorZero(), 2, evaluate=False)
-#     expr = VecMul(Vector.zero, 2, evaluate=False)
-#     # expr = VecAdd(o, v, Vector.zero)
-#     print(expr)
-#     print(expr.doit())
-
-# Unknown what this was for
-# import operator
-# from functools import reduce
-# def _prod(factors):
-#     return reduce(operator.mul, factors, 1)
+        if rt and (len(_spaces) > 0):
+            del _spaces[-1]
 
 
 if __name__ == "__main__":
