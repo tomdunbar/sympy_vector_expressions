@@ -1,0 +1,107 @@
+
+\documentclass[12pt, titlepage]{article}
+
+\usepackage{amssymb, amsmath} 
+%\usepackage{gensymb}
+\usepackage{parskip} 
+\usepackage{hyperref}
+\usepackage{graphicx}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+	
+	\section{Introduction}
+	The purpose of this document is to describe important functionality of the SymPy Symbolic Vector module.  This includes vector definitions, operations, and identities that are implemented in the module. Additionally the document describes how important SymPy functions, such as \code{expand} and \code{vector\_simplify}, interact with various vector expressions.  %Finally, examples of error messages are provided if an invalid (or unimplemented) mathematical expression is entered.
+	
+	The SymPy Symbolic Vector module implements the mainstream Gibbs/Heaviside vector algebra and calculus.  The Symbolic Vector module focuses on manipulating vector algebra and differential vector expressions.  The module focuses on these operations because of the multitude of identities and definitions in this domain.  SymPy is well suited to using these identities to grind through complex vector expressions.
+	
+	At this time, support for Clifford vector algebra (or other vector algebras) is not included.  Additionally, extensions into tensors (such as taking the gradient of a vector function) is not supported.  
+	
+	Vector integral theorems, such as Greens, Stokes, etc., all require considerable mathematical machinery, for instance, defining a closed surface's relationship to a volume. These theorems are very useful to \emph{conceptually} simplify a vector expression. However, the theorems are not well suited to \emph{mechanistic} simplification procedures, which is what computer algebra system excel at.  Therefore, no vector integral theorems are implemented as simplification methods in the Symbolic Vector module.
+	
+	In this document:
+	\begin{itemize}
+		%\item \(\mathbf{a}\), \(\mathbf{b}\), \(\mathbf{c} \), and \(\mathbf{d}\) are vectors. 
+		
+		%\item \(r\) is a scalar.
+		
+		\item \( \mathbf{F}\) and \(\mathbf{G}\) are vector functions.  
+		
+		\item \(\phi\) and \(\psi\) are scalar functions.
+	\end{itemize}
+
+	\section{One \(\nabla\) and Two Operands}
+	Of the 12 possible combinations of \(\nabla\) acting on products, 6 are valid mathematical statements within Gibbs/Heaviside vector algebra (\cite{Lopez}).
+	
+	For the 6 valid expressions, an identity is provided below for how this expression expands.  For each of these valid expressions \code{expand} should change the left hand side (LHS) of the expression into the right hand side (RHS). Similarly,  \code{vector\_simplify} should change the RHS into the LHS.
+	
+	\subsection{Gradient of two Scalar functions}
+	\[
+	\nabla (\phi \psi)=\phi\nabla \psi + \psi \nabla \phi
+	\]
+	
+	\subsection{Gradient of a dot product}
+	\[
+	\nabla ({\mathbf{F}}\cdot {\mathbf{G}})={\mathbf{F}}\times (\nabla \times {\mathbf{G}})+{\mathbf{G}}\times (\nabla \times {\mathbf{F}})+({\mathbf{F}}\cdot \nabla ){\mathbf{G}}+({\mathbf{G}}\cdot \nabla ){\mathbf{F}}
+	\]
+	
+	\subsection{Divergence of the product between a scalar and vector function}
+	\[
+	\nabla \cdot (\phi {\mathbf{F}})=\phi(\nabla \cdot {\mathbf{F}})+{\mathbf{F}}\cdot \nabla \phi
+	\]
+	
+	\subsection{Divergence of vector functions cross product}
+	\[
+	\nabla \cdot ({\mathbf{F}}\times {\mathbf{G}})={\mathbf{G}}\cdot (\nabla \times {\mathbf{F}})-{\mathbf{F}}\cdot (\nabla \times {\mathbf{G}})
+	\]
+	
+	\subsection{Curl of the product between a scalar and vector function}
+	\[
+	\nabla \times (\phi{\mathbf{F}}) =\phi(\nabla \times {\mathbf{F}}) - {\mathbf{F}} \times \nabla \phi
+	\]
+	
+	\subsection{Curl of vector functions cross product}
+	\[
+	\nabla \times ({\mathbf{F}}\times {\mathbf{G}}) ={\mathbf{F}}\,(\nabla \cdot {\mathbf{G}})-{\mathbf{G}}\,(\nabla \cdot {\mathbf{F}})+({\mathbf{G}}\cdot \nabla )\,{\mathbf{F}}-({\mathbf{F}}\cdot \nabla )\,{\mathbf{G}}
+	\]
+	
+	\section{Two \(\nabla\) and One Operand}
+	Of the possible 18 ways to arrange two \(\nabla\), three operations of multiply, dot, and cross, with one operand, only 5 are valid (\cite{Lopez}).  Of these 5 expressions, two are always zero and the other three are related by the curl of a curl identity. Note that \(\nabla \cdot \nabla = \nabla^{2}\), which is termed the Laplacian.  
+	
+	For these three identities, a discussion of how the SymPy Vector module should operate is provided below.
+	
+	\subsection{Curl of a Gradient is 0:}
+	\[ \nabla \times (\nabla \phi) =0 \]
+	
+	If a curl of a gradient is contained in a SymPy vector expression, then \code{vector\_simplify} should reduce this to 0. 
+	
+	\subsection{Divergence of a Curl is 0}
+	\[ \nabla \cdot (\nabla \times \mathbf{F}) = 0 \]
+	
+	If a divergence of a curl is contained in a SymPy vector expression, then \code{vector\_simplify} should reduce this to 0. 
+	
+	\subsection{Curl of a Curl}
+	\[
+	\nabla \times \left(\nabla \times {\mathbf{F}}\right)=\nabla (\nabla \cdot {\mathbf{F}})-\nabla ^{2}{\mathbf{F}}
+	\]
+	
+	Which can be rearranged as:
+	\[
+	\nabla (\nabla \cdot {\mathbf{F}}) = \nabla \times \left(\nabla \times {\mathbf{F}}\right)+\nabla ^{2}{\mathbf{F}}
+	\]
+	
+	Or as:
+	\[
+	\nabla ^{2}{\mathbf{F}} = \nabla (\nabla \cdot {\mathbf{F}}) - \nabla \times \left(\nabla \times {\mathbf{F}}\right)
+	\]
+	 
+	Given any of the 3 LHS above, \code{expand} should return the associated RHS.  Likewise, given the RHS of the expression, \code{vector\_simplify} should return the associated LHS.
+	
+	%\section{References}
+	\begin{thebibliography}{99}
+		\bibitem{Lopez} Robert J. Lopez, ``Advanced Engineering Mathematics'', Addison- Wesley, 2001. 
+	\end{thebibliography}
+	
+	
+\end{document}
