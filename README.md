@@ -2,12 +2,9 @@
 
 ## Motivation
 
-With Sympy we can write general symbolic expression by using symbols, functions, numbers, etc.
+With Sympy we can write general symbolic expressions using symbols, functions, numbers, etc. Similarly, we can write symbolic matrix expressions using the `MatrixExpr` module. We can also substitute dense or sparse matrices into those symbolic expressions.
 
-Similarly, we can write symbolic matrix expression using the `MatrixExpr` module. We can also substitute dense or sparse matrices into those symbolic expressions.
-
-Unfortunately, vector expressions (involving dot and cross products, magnitude, divergence, curl, etc.) are not implemented in Sympy. This module is a highly experimental attempt at implementing **vector expressions**. At the moment, only basic functionalities and printing are implemented. Take a look at the Jupyter notebooks **Tutorial** to learn how to use it. Also, feel free to help with the development.
-
+Unfortunately, vector expressions (involving dot and cross products, magnitude, divergence, curl, etc.) are not implemented in Sympy. This module is a highly experimental attempt at implementing **vector expressions**. 
 ![Vector equations image](imgs/img-1.png)
 
 ## Mathematics implimented by the module
@@ -20,9 +17,11 @@ Vector integral theorems, such as Greens, Stokes, etc., all require considerable
 
 ## Current Status
 
-The module is not in a fully functioning status. Substaintial portions need to be re-engineered and rewritten.
+At the moment, only basic functionalities and printing are implemented. Large portions of the code need to be re-engineered and/or rewritten.
 
-Take a look at the `tests` folder to see example of this module usage.
+Take a look at the Jupyter notebooks in the **Tutorial** folder to learn the intended functionality. Additionally, take a look at the `tests` folder to see example of this module usage.
+
+Finally, feel free to help with the development.
 
 ### TODO
 
