@@ -2,19 +2,37 @@
 
 ## Motivation
 
-With Sympy we can write general symbolic expression by using symbols, functions, numbers,...., which are instances of the class `Expr`.
+With Sympy we can write general symbolic expression by using symbols, functions, numbers, etc.
 
-Similarly, we can write symbolic matrix expression using instances of the class `MatrixExpr`. We can also substitute dense or sparse matrices into those symbolic expressions.
+Similarly, we can write symbolic matrix expression using the `MatrixExpr` module. We can also substitute dense or sparse matrices into those symbolic expressions.
 
-Unfortunately, vector expressions (involving dot and cross products, magnitude, divergence, curl, ...) are not implemented yet. This is a highly experimental module to implement **vector expressions**. At the moment, only basic functionalities and printing are implemented. Take a look at the Jupyter notebooks **Tutorial** to learn how to use it. Also, feel free to help with the development.
+Unfortunately, vector expressions (involving dot and cross products, magnitude, divergence, curl, etc.) are not implemented in Sympy. This module is a highly experimental attempt at implementing **vector expressions**. At the moment, only basic functionalities and printing are implemented. Take a look at the Jupyter notebooks **Tutorial** to learn how to use it. Also, feel free to help with the development.
 
 ![Vector equations image](imgs/img-1.png)
 
-## Update
+## Mathematics implimented by the module
 
-I feel like the current implementation is not good enough to be extended anymore. In order to use matrices-tensors, the module need to be re-engineered and rewritten.
+The SymPy Symbolic Vector module will implement the mainstream Gibbs/Heaviside vector algebra and calculus.  The module focuses on manipulating vector algebra and differential vector expressions.  The module focuses on these operations because of the multitude of identities and definitions in this domain.  SymPy is well suited to using these identities to grind through complicated vector expressions.
+	
+At this time, support for Clifford vector algebra (or other vector algebras) is not included.  Additionally, extensions into tensors (such as taking the gradient of a vector function) is not supported.  
+	
+Vector integral theorems, such as Greens, Stokes, etc., all require considerable mathematical machinery, for instance, defining a closed surface's relationship to a volume. These theorems are very useful to *conceptually* simplify a vector expression. However, the theorems are not well suited to *mechanistic* simplification procedures, which is what computer algebra system excel at.  Therefore, no vector integral theorems are implemented as simplification methods in the Symbolic Vector module.
+
+## Current Status
+
+The module is not in a fully functioning status. Substaintial portions need to be re-engineered and rewritten.
 
 Take a look at the `tests` folder to see example of this module usage.
+
+### TODO
+
+* Vector functions, inherited from the Function class
+* Fully implimenting the **kind** attribute
+* Derivatives of functions  - remove the D class ??
+* Operation precedence
+* Printing need some works
+* Solve for vector expressions
+* how to treat gradients
 
 ## Features
 
@@ -46,10 +64,3 @@ Take a look at the `tests` folder to see example of this module usage.
 
 ![Simplification](imgs/img-8.png)
 
-## TODO
-
-* Operation precedence.
-* Printing need some works.
-* Integrals of vector expressions.
-* Solve for vector expressions.
-* Gradient: the gradient of a vector field is a tensor (matrix). Is it possible to implement them in this module? Specifically, is it possible to substitute a tensor/matrix into a vector expression and perform the evaluation? Is it possible to integrate them with tensor and linear algebra modules?
