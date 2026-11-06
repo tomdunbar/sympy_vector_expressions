@@ -10,11 +10,16 @@ Unfortunately, vector expressions (involving dot and cross products, magnitude, 
 
 ![Vector equations image](imgs/img-1.png)
 
-## Update
+## Project status - updated 11/6/26
 
-I feel like the current implementation is not good enough to be extended anymore. In order to use matrices-tensors, the module need to be re-engineered and rewritten.
+This repository is archived and is no longer under active development. It remains publicly available for reference and for anyone interested in continuing the work.
 
-Take a look at the `tests` folder to see example of this module usage.
+My contributions include a mathematical requirements and functionality specification for symbolic vector algebra and calculus in SymPy, particularly the nabla operator.
+
+- [Nabla functionality specification (PDF)](Docs/NablaFunctionality.pdf) — available on the `ReBaseline_dvd_1` branch.
+- [Original SymPy discussion](https://github.com/sympy/sympy/issues/18987)
+
+Anyone interested in continuing development is welcome to fork this repository.
 
 ## Features
 
