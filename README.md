@@ -16,7 +16,7 @@ This repository is archived and is no longer under active development. It remain
 
 My contributions include a mathematical requirements and functionality specification for symbolic vector algebra and calculus in SymPy, particularly the nabla operator.
 
-- [Nabla functionality specification (PDF)](Docs/NablaFunctionality.pdf) — available on the `ReBaseline_dvd_1` branch.
+- [Nabla functionality specification (PDF)](https://github.com/tomdunbar/sympy_vector_expressions/blob/ReBaseline_dvd_1/Docs/NablaFunctionality.pdf) — available on the `ReBaseline_dvd_1` branch.
 - [Original SymPy discussion](https://github.com/sympy/sympy/issues/18987)
 
 Anyone interested in continuing development is welcome to fork this repository.
